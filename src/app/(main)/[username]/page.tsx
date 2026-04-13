@@ -13,7 +13,7 @@ const BASE_URL = 'https://mooseeka.com'
 /* Mock "current user" — will come from Supabase auth later */
 const CURRENT_USER = 'elenarios'
 
-const MOCK_PROFILES: Record<string, typeof MOCK_PROFILE_BASE> = {
+const MOCK_PROFILES: Record<string, any> = {
   elenarios: {
     name: 'Elena Ríos',
     username: 'elenarios',
@@ -168,7 +168,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             <div className="mb-6">
               <h3 className="text-white font-bold mb-3">Portfolio</h3>
               <div className="flex gap-3">
-                {profile.portfolio.map(item => (
+                {profile.portfolio.map((item: any) => (
                   <div key={item.title} className="w-20 h-20 rounded-xl overflow-hidden cursor-pointer group relative">
                     <img src={item.cover} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -195,7 +195,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                   </Link>
                 )}
               </div>
-              {profile.services.map(service => (
+              {profile.services.map((service: any) => (
                 <div key={service.id} className="flex items-center gap-2 group">
                   <Link href={`/services/${service.id}`}
                     className="flex-1 flex items-center justify-between rounded-xl p-4 transition-all"
@@ -236,7 +236,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               <h3 className="text-white font-bold text-sm mb-3">Highlights</h3>
               {/* On mobile: horizontal scroll row. On md+: vertical list */}
               <div className="flex md:flex-col gap-4 md:gap-2.5 overflow-x-auto pb-1 md:pb-0">
-                {profile.highlights.map(h => (
+                {profile.highlights.map((h: any) => (
                   <div key={h.label} className="flex items-start gap-2 shrink-0 md:shrink">
                     <span className="text-sm">{h.icon}</span>
                     <div>
@@ -270,7 +270,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </div>
                 {/* Bar chart */}
                 <div className="flex items-end gap-0.5 h-14 mb-2">
-                  {profile.views.weekly.map((v, i) => (
+                  {profile.views.weekly.map((v: any, i: number) => (
                     <div key={i} className="flex-1 rounded-sm transition-all"
                       style={{
                         height: `${Math.round((v / maxWeekly) * 100)}%`,
@@ -306,7 +306,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       />
 
       {/* Service share modals */}
-      {profile.services.map(service => (
+      {profile.services.map((service: any) => (
         <ShareModal
           key={service.id}
           open={serviceShareId === service.id}

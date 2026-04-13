@@ -26,7 +26,7 @@ export default function BottomNav() {
         borderTop: '1px solid rgba(123,47,255,0.18)',
         paddingBottom: 'max(env(safe-area-inset-bottom), 10px)',
       }}>
-      {NAV_ITEMS.map(({ href, icon: Icon, label, badge }) => {
+      {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
         const isActive = pathname === href
         return (
           <Link
@@ -38,13 +38,6 @@ export default function BottomNav() {
                 size={23}
                 style={{ color: isActive ? '#FF1A8C' : '#7A6890' }}
               />
-              {badge && (
-                <span
-                  className="absolute -top-1 -right-2 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
-                  style={{ background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)' }}>
-                  {badge}
-                </span>
-              )}
             </div>
             <span
               className="text-[10px]"
