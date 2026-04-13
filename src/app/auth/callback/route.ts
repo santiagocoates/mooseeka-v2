@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const cookieStore = await cookies()
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -15,9 +16,9 @@ export async function GET(request: NextRequest) {
         cookies: {
           getAll() { return cookieStore.getAll() },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
+            cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options)
-            )
+            })
           },
         },
       }
@@ -26,12 +27,16 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data.user) {
-      // Si el usuario se creó hace menos de 10 segundos → es nuevo → onboarding
       const createdAt = new Date(data.user.created_at).getTime()
-      const now = Date.now()
-      const isNewUser = now - createdAt < 10_000
+      const isNewUser = Date.now() - createdAt < 10_000
+      const redirectTo = isNewUser ? '/onboarding' : '/home'
 
-      return NextResponse.redirect(`${origin}${isNewUser ? '/onboarding' : '/home'}`)
+      // Build the redirect and copy all cookies onto it
+      const response = NextResponse.redirect(`${origin}${redirectTo}`)
+      cookieStore.getAll().forEach(({ name, value }) => {
+        response.cookies.set(name, value)
+      })
+      return response
     }
   }
 
