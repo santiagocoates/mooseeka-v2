@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Home, ShoppingBag, Compass, MessageSquare, User, Settings, LogOut, Package, ShieldCheck } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 /* Mock current user — will come from Supabase auth later */
 const CURRENT_USERNAME = 'elenarios'
@@ -20,6 +21,13 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   return (
     <aside className="hidden md:flex w-[220px] shrink-0 h-screen sticky top-0 flex-col border-r"
@@ -93,7 +101,7 @@ export default function Sidebar() {
           <Settings size={17} />
           <span className="text-sm font-medium">Configuración</span>
         </Link>
-        <button className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#7A6890] hover:text-[#FF1A8C] hover:bg-[#FF1A8C]/8 transition-all w-full text-left">
+        <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#7A6890] hover:text-[#FF1A8C] hover:bg-[#FF1A8C]/8 transition-all w-full text-left">
           <LogOut size={17} />
           <span className="text-sm font-medium">Cerrar Sesión</span>
         </button>
