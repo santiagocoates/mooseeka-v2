@@ -27,11 +27,17 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data.user) {
-      const createdAt = new Date(data.user.created_at).getTime()
-      const isNewUser = Date.now() - createdAt < 10_000
-      const redirectTo = isNewUser ? '/onboarding' : '/home'
+      // Check onboarding_completed from the profile — more reliable than created_at timing
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', data.user.id)
+        .maybeSingle()
 
-      // Build the redirect and copy all cookies onto it
+      // Go to onboarding if: no profile yet OR onboarding not completed
+      const needsOnboarding = !profile || !profile.onboarding_completed
+      const redirectTo = needsOnboarding ? '/onboarding' : '/home'
+
       const response = NextResponse.redirect(`${origin}${redirectTo}`)
       cookieStore.getAll().forEach(({ name, value }) => {
         response.cookies.set(name, value)
