@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import EditProfileModal from '@/components/profile/EditProfileModal'
 import ShareModal from '@/components/shared/ShareModal'
 import { SocialLinks } from '@/components/profile/SocialIcons'
+import PortfolioSection from '@/components/profile/PortfolioSection'
+import ExperienceSection from '@/components/profile/ExperienceSection'
 
 const BASE_URL = 'https://mooseeka.com'
 
@@ -221,6 +223,12 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left column */}
           <div className="flex-1 min-w-0">
+            {/* Portfolio */}
+            <PortfolioSection profileId={profile.id} isOwner={isOwner} />
+
+            {/* Experience */}
+            <ExperienceSection profileId={profile.id} isOwner={isOwner} />
+
             {/* Services */}
             {(services.length > 0 || isOwner) && (
               <div>
