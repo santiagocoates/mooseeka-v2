@@ -103,7 +103,7 @@ export default function ExperienceSection({ profileId, isOwner }: ExperienceSect
     <>
       <div className="mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-white font-bold text-base">Trayectoria</h3>
+          <h3 className="text-white font-bold text-base">Trayectoria musical</h3>
           {isOwner && (
             <button onClick={openAdd}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all hover:opacity-90 gradient-magenta text-white">

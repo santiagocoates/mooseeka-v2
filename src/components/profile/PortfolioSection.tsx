@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, ExternalLink, Music } from 'lucide-react'
+import { Plus, Pencil, Trash2, Music } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import PortfolioModal, { PortfolioItem } from './PortfolioModal'
 
@@ -25,6 +25,25 @@ const TYPE_COLORS: Record<string, string> = {
   mezcla:  '#10b981',
   jingle:  '#f97316',
   otro:    '#7A6890',
+}
+
+function detectEmbed(url: string): { type: 'spotify' | 'youtube' | null; embedUrl: string | null } {
+  if (!url) return { type: null, embedUrl: null }
+
+  const spotifyMatch = url.match(/open\.spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/)
+  if (spotifyMatch) {
+    return {
+      type: 'spotify',
+      embedUrl: `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}?utm_source=generator&theme=0`,
+    }
+  }
+
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+  if (ytMatch) {
+    return { type: 'youtube', embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}` }
+  }
+
+  return { type: null, embedUrl: null }
 }
 
 interface PortfolioSectionProps {
@@ -76,8 +95,8 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
     if (expanded === id) setExpanded(null)
   }
 
-  function openAdd()  { setEditing(null); setModalOpen(true) }
-  function openEdit(item: PortfolioItem) { setEditing(item); setModalOpen(true) }
+  function openAdd()                     { setEditing(null);  setModalOpen(true) }
+  function openEdit(item: PortfolioItem) { setEditing(item);  setModalOpen(true) }
 
   if (loading) return null
 
@@ -85,7 +104,7 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
     <>
       <div className="mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-white font-bold text-base">Portafolio</h3>
+          <h3 className="text-white font-bold text-base">Portafolio musical</h3>
           {isOwner && (
             <button onClick={openAdd}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all hover:opacity-90 gradient-magenta text-white">
@@ -117,8 +136,9 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
         {items.length > 0 && (
           <div className="grid grid-cols-3 gap-3">
             {items.map(item => {
-              const color = TYPE_COLORS[item.type] ?? '#7A6890'
+              const color      = TYPE_COLORS[item.type] ?? '#7A6890'
               const isExpanded = expanded === item.id
+              const embed      = detectEmbed(item.link)
 
               return (
                 <div key={item.id} className="flex flex-col">
@@ -128,7 +148,8 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
                     className="relative aspect-square rounded-xl overflow-hidden cursor-pointer group"
                     style={{ background: 'rgba(25,0,50,0.8)', border: `1px solid rgba(123,47,255,0.2)` }}>
                     {item.cover_url ? (
-                      <img src={item.cover_url} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <img src={item.cover_url} alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center"
                         style={{ background: `linear-gradient(135deg, ${color}22, rgba(10,0,20,0.8))` }}>
@@ -140,24 +161,9 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
                       style={{ background: `${color}dd`, color: '#fff' }}>
                       {TYPE_LABELS[item.type] ?? item.type}
                     </div>
-                    {/* Owner actions */}
-                    {isOwner && (
-                      <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={e => { e.stopPropagation(); openEdit(item) }}
-                          className="w-6 h-6 rounded-lg flex items-center justify-center text-white"
-                          style={{ background: 'rgba(0,0,0,0.7)' }}>
-                          <Pencil size={11} />
-                        </button>
-                        <button onClick={e => { e.stopPropagation(); handleDelete(item.id) }}
-                          className="w-6 h-6 rounded-lg flex items-center justify-center text-white hover:bg-red-500/80 transition-colors"
-                          style={{ background: 'rgba(0,0,0,0.7)' }}>
-                          <Trash2 size={11} />
-                        </button>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Title */}
+                  {/* Title + meta */}
                   <p className="text-white text-xs font-semibold mt-1.5 truncate">{item.title}</p>
                   {(item.year || item.role) && (
                     <p className="text-[10px] truncate" style={{ color: '#7A6890' }}>
@@ -165,20 +171,65 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
                     </p>
                   )}
 
-                  {/* Expanded detail */}
+                  {/* Edit / Delete — always visible for owner */}
+                  {isOwner && (
+                    <div className="flex gap-1.5 mt-1.5">
+                      <button onClick={() => openEdit(item)}
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors hover:bg-white/10"
+                        style={{ color: '#7A6890', border: '1px solid rgba(123,47,255,0.2)' }}>
+                        <Pencil size={10} />
+                        Editar
+                      </button>
+                      <button onClick={() => handleDelete(item.id)}
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors hover:bg-red-500/15 hover:text-red-400"
+                        style={{ color: '#7A6890', border: '1px solid rgba(123,47,255,0.2)' }}>
+                        <Trash2 size={10} />
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Expanded — span all columns with negative margin trick */}
                   {isExpanded && (
-                    <div className="mt-2 p-3 rounded-xl col-span-3"
-                      style={{ background: 'rgba(25,0,50,0.8)', border: '1px solid rgba(123,47,255,0.2)' }}>
-                      {item.description && (
-                        <p className="text-xs leading-relaxed mb-2" style={{ color: '#C0A8D8' }}>{item.description}</p>
+                    <div className="mt-2 rounded-xl overflow-hidden col-span-3"
+                      style={{ border: '1px solid rgba(123,47,255,0.2)' }}>
+                      {/* Spotify embed */}
+                      {embed.type === 'spotify' && (
+                        <iframe
+                          src={embed.embedUrl!}
+                          width="100%"
+                          height="152"
+                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                          loading="lazy"
+                          style={{ borderRadius: 12, border: 'none', display: 'block' }}
+                        />
                       )}
-                      {item.link && (
-                        <a href={item.link} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-semibold transition-colors hover:text-white"
-                          style={{ color: color }}>
-                          <ExternalLink size={11} />
-                          Escuchar / Ver
-                        </a>
+                      {/* YouTube embed */}
+                      {embed.type === 'youtube' && (
+                        <iframe
+                          src={embed.embedUrl!}
+                          width="100%"
+                          height="200"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          loading="lazy"
+                          style={{ border: 'none', display: 'block', borderRadius: 12 }}
+                        />
+                      )}
+                      {/* Description + plain link fallback */}
+                      {(item.description || (item.link && embed.type === null)) && (
+                        <div className="p-3" style={{ background: 'rgba(25,0,50,0.8)' }}>
+                          {item.description && (
+                            <p className="text-xs leading-relaxed mb-2" style={{ color: '#C0A8D8' }}>{item.description}</p>
+                          )}
+                          {item.link && embed.type === null && (
+                            <a href={item.link} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold transition-colors hover:text-white"
+                              style={{ color }}>
+                              Abrir enlace →
+                            </a>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
