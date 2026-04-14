@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import StepProgress from '@/components/onboarding/StepProgress'
+import { useOnboarding } from '../context'
 
 const ROLES = [
   { id: 'artista',    label: 'Artista',             emoji: '🎤', desc: 'Cantante, músico, MC' },
@@ -24,7 +25,8 @@ const MAX_ROLES = 4
 
 export default function OnboardingRoles() {
   const router = useRouter()
-  const [selected, setSelected] = useState<string[]>([])
+  const { roles: savedRoles, update } = useOnboarding()
+  const [selected, setSelected] = useState<string[]>(savedRoles)
 
   function toggle(id: string) {
     setSelected(prev =>
@@ -32,6 +34,11 @@ export default function OnboardingRoles() {
         ? prev.filter(r => r !== id)
         : prev.length < MAX_ROLES ? [...prev, id] : prev
     )
+  }
+
+  function handleContinue() {
+    update({ roles: selected })
+    router.push('/onboarding/generos')
   }
 
   const canContinue = selected.length >= 1
@@ -76,7 +83,7 @@ export default function OnboardingRoles() {
           const disabled   = !isSelected && selected.length >= MAX_ROLES
           return (
             <button key={role.id} onClick={() => toggle(role.id)} disabled={disabled}
-              className="flex flex-col items-start gap-2 p-4 rounded-2xl text-left transition-all disabled:opacity-35"
+              className="relative flex flex-col items-start gap-2 p-4 rounded-2xl text-left transition-all disabled:opacity-35"
               style={isSelected
                 ? { background: 'rgba(139,63,255,0.2)', border: '2px solid rgba(139,63,255,0.7)' }
                 : { background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.2)' }}
@@ -99,7 +106,7 @@ export default function OnboardingRoles() {
 
       <button
         disabled={!canContinue}
-        onClick={() => router.push('/onboarding/generos')}
+        onClick={handleContinue}
         className="w-full py-3.5 rounded-full text-white font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 gradient-magenta glow-btn hover:opacity-90">
         Continuar
         <ArrowRight size={18} />

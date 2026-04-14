@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { X, Camera, Plus, Trash2 } from 'lucide-react'
 import { SOCIAL_CONFIG } from './SocialIcons'
+import { createClient } from '@/lib/supabase/client'
 
 const ROLES = [
   'Artista', 'Productor', 'Ingeniero de Mezcla', 'Masterizador',
@@ -10,29 +11,44 @@ const ROLES = [
   'Abogado Musical', 'Educador', 'Otro',
 ]
 
+interface Profile {
+  id: string
+  name: string
+  username: string
+  bio: string | null
+  location: string | null
+  avatar_url: string | null
+  cover_url: string | null
+  roles: string[] | null
+  social_links: Record<string, string> | null
+}
+
 interface EditProfileModalProps {
   open: boolean
   onClose: () => void
+  profile: Profile
+  onSave: (updated: Partial<Profile>) => void
 }
 
-export default function EditProfileModal({ open, onClose }: EditProfileModalProps) {
-  const [name, setName] = useState('Elena Ríos')
-  const [username, setUsername] = useState('elenarios')
-  const [bio, setBio] = useState('Especializada en diseño sonoro para proyectos indie y música experimental.')
-  const [location, setLocation] = useState('Barcelona, ES')
-  const [website, setWebsite] = useState('')
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(['Productora', 'Ingeniero de Mezcla'])
-  const [highlight1, setHighlight1] = useState('"Resonancia" (Álbum)')
-  const [highlight2, setHighlight2] = useState('')
-  const [activeTab, setActiveTab] = useState<'info' | 'roles' | 'highlights' | 'redes'>('info')
-  const [socials, setSocials] = useState<Record<string, string>>({
-    instagram: 'elenarios.music',
-    tiktok: '',
-    spotify: '',
-    youtube: '',
-    soundcloud: '',
-    twitter: '',
-  })
+export default function EditProfileModal({ open, onClose, profile, onSave }: EditProfileModalProps) {
+  const [name, setName]         = useState(profile.name ?? '')
+  const [username, setUsername] = useState(profile.username ?? '')
+  const [bio, setBio]           = useState(profile.bio ?? '')
+  const [location, setLocation] = useState(profile.location ?? '')
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(profile.roles ?? [])
+  const [socials, setSocials]   = useState<Record<string, string>>(profile.social_links ?? {})
+  const [activeTab, setActiveTab] = useState<'info' | 'roles' | 'redes'>('info')
+
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile.avatar_url)
+  const [avatarFile, setAvatarFile]       = useState<File | null>(null)
+  const [bannerPreview, setBannerPreview] = useState<string | null>(profile.cover_url)
+  const [bannerFile, setBannerFile]       = useState<File | null>(null)
+
+  const [saving, setSaving]   = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const avatarRef = useRef<HTMLInputElement>(null)
+  const bannerRef = useRef<HTMLInputElement>(null)
 
   const BIO_LIMIT = 200
 
@@ -40,6 +56,70 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
     setSelectedRoles(prev =>
       prev.includes(role) ? prev.filter(r => r !== role) : prev.length < 4 ? [...prev, role] : prev
     )
+  }
+
+  function handleAvatarFile(file: File) {
+    if (!file.type.startsWith('image/')) return
+    setAvatarPreview(URL.createObjectURL(file))
+    setAvatarFile(file)
+  }
+
+  function handleBannerFile(file: File) {
+    if (!file.type.startsWith('image/')) return
+    setBannerPreview(URL.createObjectURL(file))
+    setBannerFile(file)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const supabase = createClient()
+
+      let avatar_url = profile.avatar_url
+      let cover_url  = profile.cover_url
+
+      if (avatarFile) {
+        const ext = avatarFile.name.split('.').pop()
+        const { error } = await supabase.storage
+          .from('avatars').upload(`${profile.id}/avatar.${ext}`, avatarFile, { upsert: true })
+        if (!error) {
+          const { data } = supabase.storage.from('avatars').getPublicUrl(`${profile.id}/avatar.${ext}`)
+          avatar_url = data.publicUrl
+        }
+      }
+
+      if (bannerFile) {
+        const ext = bannerFile.name.split('.').pop()
+        const { error } = await supabase.storage
+          .from('avatars').upload(`${profile.id}/banner.${ext}`, bannerFile, { upsert: true })
+        if (!error) {
+          const { data } = supabase.storage.from('avatars').getPublicUrl(`${profile.id}/banner.${ext}`)
+          cover_url = data.publicUrl
+        }
+      }
+
+      const updates: Partial<Profile> = {
+        name,
+        username,
+        bio: bio || null,
+        location: location || null,
+        roles: selectedRoles,
+        social_links: socials,
+        avatar_url,
+        cover_url,
+      }
+
+      const { error } = await supabase.from('profiles').update(updates).eq('id', profile.id)
+      if (error) throw error
+
+      onSave(updates)
+    } catch (err: unknown) {
+      console.error(err)
+      setSaveError('Error al guardar. Intenta de nuevo.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!open) return null
@@ -63,13 +143,13 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
 
         {/* Tabs */}
         <div className="flex px-5 pt-4 gap-1 shrink-0 overflow-x-auto pb-0.5">
-          {(['info', 'roles', 'highlights', 'redes'] as const).map(tab => (
+          {(['info', 'roles', 'redes'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className="px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all shrink-0"
               style={activeTab === tab
                 ? { background: 'linear-gradient(135deg, #8B3FFF, #FF1A8C)', color: '#fff' }
                 : { color: '#7A6890', background: 'rgba(255,255,255,0.04)' }}>
-              {tab === 'info' ? 'Info' : tab === 'roles' ? 'Roles' : tab === 'highlights' ? 'Highlights' : '🔗 Redes'}
+              {tab === 'info' ? 'Info' : tab === 'roles' ? 'Roles' : '🔗 Redes'}
             </button>
           ))}
         </div>
@@ -80,11 +160,18 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
           {/* ── Tab: Info ── */}
           {activeTab === 'info' && (
             <div className="flex flex-col gap-5">
-              {/* Cover + Avatar */}
+              {/* Banner + Avatar */}
               <div className="relative">
-                <div className="h-28 rounded-xl overflow-hidden relative group cursor-pointer"
+                {/* Banner */}
+                <div
+                  onClick={() => bannerRef.current?.click()}
+                  className="h-28 rounded-xl overflow-hidden relative group cursor-pointer"
                   style={{ background: 'linear-gradient(135deg, #15002A, #0E001C)' }}>
-                  <img src="/covers/studio1.jpg" alt="cover" className="w-full h-full object-cover opacity-70" />
+                  {bannerPreview ? (
+                    <img src={bannerPreview} alt="portada" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, #15002A, #0E001C)' }} />
+                  )}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ background: 'rgba(0,0,0,0.5)' }}>
                     <div className="flex flex-col items-center gap-1.5 text-white">
@@ -93,18 +180,32 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
                     </div>
                   </div>
                 </div>
+                <input ref={bannerRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerFile(f) }} />
+
                 {/* Avatar */}
-                <div className="absolute -bottom-6 left-4 group cursor-pointer">
-                  <img src="/users/productores.jpg" alt="avatar"
-                    className="w-14 h-14 rounded-full object-cover"
-                    style={{ border: '3px solid #0E001C', outline: '2px solid rgba(123,47,255,0.5)' }} />
+                <div
+                  onClick={() => avatarRef.current?.click()}
+                  className="absolute -bottom-6 left-4 group cursor-pointer w-14 h-14">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="avatar"
+                      className="w-14 h-14 rounded-full object-cover"
+                      style={{ border: '3px solid #0E001C', outline: '2px solid rgba(123,47,255,0.5)' }} />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-black"
+                      style={{ border: '3px solid #0E001C', outline: '2px solid rgba(123,47,255,0.5)', background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)', color: '#fff' }}>
+                      {name[0]?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
                   <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ background: 'rgba(0,0,0,0.6)' }}>
                     <Camera size={14} className="text-white" />
                   </div>
                 </div>
+                <input ref={avatarRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarFile(f) }} />
               </div>
-              <div className="h-8" /> {/* space for avatar overlap */}
+              <div className="h-8" />
 
               <FormField label="Nombre" value={name} onChange={setName} placeholder="Tu nombre completo" />
               <FormField label="Usuario" value={username} onChange={setUsername} placeholder="tu_usuario" prefix="@" />
@@ -121,7 +222,6 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
                 </div>
               </div>
               <FormField label="Ubicación" value={location} onChange={setLocation} placeholder="Ciudad, País" />
-              <FormField label="Sitio web" value={website} onChange={setWebsite} placeholder="https://tu-sitio.com" />
             </div>
           )}
 
@@ -176,7 +276,6 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
                   Opcional. Las redes que completes aparecerán como íconos en tu perfil público.
                 </p>
               </div>
-
               {SOCIAL_CONFIG.map(s => (
                 <div key={s.id}>
                   <label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 mb-2"
@@ -208,7 +307,6 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
                   </div>
                 </div>
               ))}
-
               <div className="rounded-xl p-3 flex items-start gap-2.5"
                 style={{ background: 'rgba(139,63,255,0.07)', border: '1px dashed rgba(139,63,255,0.25)' }}>
                 <span className="text-base shrink-0">💡</span>
@@ -218,58 +316,24 @@ export default function EditProfileModal({ open, onClose }: EditProfileModalProp
               </div>
             </div>
           )}
-
-          {/* ── Tab: Highlights ── */}
-          {activeTab === 'highlights' && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <p className="text-white font-semibold text-sm mb-1">Highlights del perfil</p>
-                <p className="text-xs" style={{ color: '#7A6890' }}>Estos datos aparecen en el panel derecho de tu perfil.</p>
-              </div>
-
-              {[
-                { emoji: '🎵', label: 'Proyecto actual', value: highlight1, onChange: setHighlight1, placeholder: 'Ej: "Resonancia" (Álbum)' },
-                { emoji: '🔗', label: 'Colaboración destacada', value: highlight2, onChange: setHighlight2, placeholder: 'Ej: Mix para @Artista' },
-              ].map(h => (
-                <div key={h.label}>
-                  <label className="text-xs font-bold uppercase tracking-wider block mb-2" style={{ color: '#7A6890' }}>
-                    {h.emoji} {h.label}
-                  </label>
-                  <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(123,47,255,0.2)' }}>
-                    <input value={h.value} onChange={e => h.onChange(e.target.value)} placeholder={h.placeholder}
-                      className="flex-1 bg-transparent text-white placeholder-[#7A6890] text-sm focus:outline-none" />
-                    {h.value && (
-                      <button onClick={() => h.onChange('')} style={{ color: '#7A6890' }} className="hover:text-[#FF1A8C] transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              <div className="rounded-xl p-4 mt-2"
-                style={{ background: 'rgba(139,63,255,0.08)', border: '1px solid rgba(139,63,255,0.2)' }}>
-                <p className="text-xs font-semibold mb-1" style={{ color: '#A855F7' }}>📍 Ubicación</p>
-                <p className="text-white text-sm">{location || 'No configurada'}</p>
-                <p className="text-xs mt-1" style={{ color: '#7A6890' }}>Se toma de la pestaña Info</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
         <div className="px-5 py-4 flex items-center justify-between shrink-0"
           style={{ borderTop: '1px solid rgba(123,47,255,0.15)' }}>
-          <button onClick={onClose} className="text-sm font-medium px-4 py-2 rounded-full transition-all"
-            style={{ color: '#7A6890' }} onMouseOver={e => (e.currentTarget.style.color = '#fff')}
-            onMouseOut={e => (e.currentTarget.style.color = '#7A6890')}>
-            Cancelar
-          </button>
-          <button onClick={onClose}
-            className="text-white font-bold px-6 py-2.5 rounded-full text-sm transition-all gradient-magenta glow-btn hover:opacity-90">
-            Guardar cambios
-          </button>
+          {saveError && <p className="text-xs" style={{ color: '#ef4444' }}>{saveError}</p>}
+          {!saveError && <div />}
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="text-sm font-medium px-4 py-2 rounded-full transition-all"
+              style={{ color: '#7A6890' }} onMouseOver={e => (e.currentTarget.style.color = '#fff')}
+              onMouseOut={e => (e.currentTarget.style.color = '#7A6890')}>
+              Cancelar
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="text-white font-bold px-6 py-2.5 rounded-full text-sm transition-all gradient-magenta glow-btn hover:opacity-90 disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -4,39 +4,46 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import StepProgress from '@/components/onboarding/StepProgress'
+import { useOnboarding } from '../context'
 
 const GENRES = [
-  { id: 'reggaeton',   label: 'Reggaetón',       emoji: '🔥' },
-  { id: 'trap',        label: 'Trap',             emoji: '⛓️' },
-  { id: 'pop',         label: 'Pop',              emoji: '⭐' },
-  { id: 'rock',        label: 'Rock',             emoji: '🎸' },
-  { id: 'electronic',  label: 'Electrónica',      emoji: '🎛️' },
-  { id: 'hiphop',      label: 'Hip Hop',          emoji: '🎤' },
-  { id: 'latin',       label: 'Latin',            emoji: '💃' },
-  { id: 'rancheras',   label: 'Regional Mexicano',emoji: '🤠' },
-  { id: 'salsa',       label: 'Salsa / Cumbia',   emoji: '🎺' },
-  { id: 'afrobeats',   label: 'Afrobeats',        emoji: '🥁' },
-  { id: 'jazz',        label: 'Jazz',             emoji: '🎷' },
-  { id: 'rythmsoul',   label: 'R&B / Soul',       emoji: '🎶' },
-  { id: 'folk',        label: 'Folk / Indie',     emoji: '🪕' },
-  { id: 'classical',   label: 'Clásica',          emoji: '🎻' },
-  { id: 'metal',       label: 'Metal',            emoji: '🤘' },
-  { id: 'ambient',     label: 'Ambient',          emoji: '🌊' },
-  { id: 'house',       label: 'House / Techno',   emoji: '🏠' },
-  { id: 'otro',        label: 'Otro',             emoji: '🎵' },
+  { id: 'reggaeton',   label: 'Reggaetón',        emoji: '🔥' },
+  { id: 'trap',        label: 'Trap',              emoji: '⛓️' },
+  { id: 'pop',         label: 'Pop',               emoji: '⭐' },
+  { id: 'rock',        label: 'Rock',              emoji: '🎸' },
+  { id: 'electronic',  label: 'Electrónica',       emoji: '🎛️' },
+  { id: 'hiphop',      label: 'Hip Hop',           emoji: '🎤' },
+  { id: 'latin',       label: 'Latin',             emoji: '💃' },
+  { id: 'rancheras',   label: 'Regional Mexicano', emoji: '🤠' },
+  { id: 'salsa',       label: 'Salsa / Cumbia',    emoji: '🎺' },
+  { id: 'afrobeats',   label: 'Afrobeats',         emoji: '🥁' },
+  { id: 'jazz',        label: 'Jazz',              emoji: '🎷' },
+  { id: 'rythmsoul',   label: 'R&B / Soul',        emoji: '🎶' },
+  { id: 'folk',        label: 'Folk / Indie',      emoji: '🪕' },
+  { id: 'classical',   label: 'Clásica',           emoji: '🎻' },
+  { id: 'metal',       label: 'Metal',             emoji: '🤘' },
+  { id: 'ambient',     label: 'Ambient',           emoji: '🌊' },
+  { id: 'house',       label: 'House / Techno',    emoji: '🏠' },
+  { id: 'otro',        label: 'Otro',              emoji: '🎵' },
 ]
 
 const MAX = 5
 
 export default function OnboardingGeneros() {
   const router = useRouter()
-  const [selected, setSelected] = useState<string[]>([])
+  const { genres: savedGenres, update } = useOnboarding()
+  const [selected, setSelected] = useState<string[]>(savedGenres)
 
   function toggle(id: string) {
     setSelected(prev =>
       prev.includes(id) ? prev.filter(g => g !== id)
         : prev.length < MAX ? [...prev, id] : prev
     )
+  }
+
+  function handleContinue() {
+    update({ genres: selected })
+    router.push('/onboarding/objetivo')
   }
 
   const canContinue = selected.length >= 1
@@ -54,7 +61,6 @@ export default function OnboardingGeneros() {
         </p>
       </div>
 
-      {/* Genre pills */}
       <div className="flex flex-wrap gap-2.5 mb-8">
         {GENRES.map(g => {
           const isSelected = selected.includes(g.id)
@@ -74,7 +80,6 @@ export default function OnboardingGeneros() {
         })}
       </div>
 
-      {/* Counter */}
       <p className="text-xs mb-6" style={{ color: '#7A6890' }}>
         {selected.length === 0
           ? 'Selecciona al menos un género'
@@ -83,7 +88,7 @@ export default function OnboardingGeneros() {
 
       <button
         disabled={!canContinue}
-        onClick={() => router.push('/onboarding/objetivo')}
+        onClick={handleContinue}
         className="w-full py-3.5 rounded-full text-white font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 gradient-magenta glow-btn hover:opacity-90">
         Continuar
         <ArrowRight size={18} />
