@@ -49,17 +49,18 @@ export default function OnboardingListo() {
 
         const { error: updateError } = await supabase
           .from('profiles')
-          .update({
-            ...(name ? { name } : {}),
-            ...(username ? { username } : {}),
+          .upsert({
+            id: user.id,
+            email: user.email,
+            name: name || user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+            username: username || user.email?.split('@')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || user.id.slice(0, 8),
             ...(avatar_url ? { avatar_url } : {}),
             ...(cover_url ? { cover_url } : {}),
             roles,
             genres,
             objetivo,
             onboarding_completed: true,
-          })
-          .eq('id', user.id)
+          }, { onConflict: 'id' })
 
         if (updateError) throw updateError
       } catch (err: unknown) {
