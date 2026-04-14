@@ -142,26 +142,55 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
 
               return (
                 <div key={item.id} className="flex flex-col">
-                  {/* Cover */}
-                  <div
-                    onClick={() => setExpanded(isExpanded ? null : item.id)}
-                    className="relative aspect-square rounded-xl overflow-hidden cursor-pointer group"
-                    style={{ background: 'rgba(25,0,50,0.8)', border: `1px solid rgba(123,47,255,0.2)` }}>
-                    {item.cover_url ? (
-                      <img src={item.cover_url} alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center"
-                        style={{ background: `linear-gradient(135deg, ${color}22, rgba(10,0,20,0.8))` }}>
-                        <Music size={28} style={{ color: `${color}88` }} />
-                      </div>
-                    )}
-                    {/* Type badge */}
-                    <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold"
-                      style={{ background: `${color}dd`, color: '#fff' }}>
-                      {TYPE_LABELS[item.type] ?? item.type}
+                  {/* Cover or embed — embed replaces cover when expanded */}
+                  {isExpanded && embed.type ? (
+                    <div className="rounded-xl overflow-hidden relative" style={{ border: '1px solid rgba(123,47,255,0.2)' }}>
+                      <button onClick={() => setExpanded(null)}
+                        className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                        style={{ background: 'rgba(0,0,0,0.6)' }}>✕</button>
+                      {embed.type === 'spotify' && (
+                        <iframe
+                          src={embed.embedUrl!}
+                          width="100%"
+                          height="152"
+                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                          loading="lazy"
+                          style={{ borderRadius: 12, border: 'none', display: 'block' }}
+                        />
+                      )}
+                      {embed.type === 'youtube' && (
+                        <iframe
+                          src={embed.embedUrl!}
+                          width="100%"
+                          height="180"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          loading="lazy"
+                          style={{ border: 'none', display: 'block', borderRadius: 12 }}
+                        />
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <div
+                      onClick={() => setExpanded(isExpanded ? null : item.id)}
+                      className="relative aspect-square rounded-xl overflow-hidden cursor-pointer group"
+                      style={{ background: 'rgba(25,0,50,0.8)', border: `1px solid rgba(123,47,255,0.2)` }}>
+                      {item.cover_url ? (
+                        <img src={item.cover_url} alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center"
+                          style={{ background: `linear-gradient(135deg, ${color}22, rgba(10,0,20,0.8))` }}>
+                          <Music size={28} style={{ color: `${color}88` }} />
+                        </div>
+                      )}
+                      {/* Type badge */}
+                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold"
+                        style={{ background: `${color}dd`, color: '#fff' }}>
+                        {TYPE_LABELS[item.type] ?? item.type}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Title + meta */}
                   <p className="text-white text-xs font-semibold mt-1.5 truncate">{item.title}</p>
@@ -169,6 +198,22 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
                     <p className="text-[10px] truncate" style={{ color: '#7A6890' }}>
                       {[item.role, item.year].filter(Boolean).join(' · ')}
                     </p>
+                  )}
+
+                  {/* Description + plain link fallback when expanded without embed */}
+                  {isExpanded && embed.type === null && (item.description || item.link) && (
+                    <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(25,0,50,0.8)', border: '1px solid rgba(123,47,255,0.2)' }}>
+                      {item.description && (
+                        <p className="text-xs leading-relaxed mb-2" style={{ color: '#C0A8D8' }}>{item.description}</p>
+                      )}
+                      {item.link && (
+                        <a href={item.link} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold transition-colors hover:text-white"
+                          style={{ color }}>
+                          Abrir enlace →
+                        </a>
+                      )}
+                    </div>
                   )}
 
                   {/* Edit / Delete — always visible for owner */}
@@ -186,51 +231,6 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
                         <Trash2 size={10} />
                         Eliminar
                       </button>
-                    </div>
-                  )}
-
-                  {/* Expanded — span all columns with negative margin trick */}
-                  {isExpanded && (
-                    <div className="mt-2 rounded-xl overflow-hidden col-span-3"
-                      style={{ border: '1px solid rgba(123,47,255,0.2)' }}>
-                      {/* Spotify embed */}
-                      {embed.type === 'spotify' && (
-                        <iframe
-                          src={embed.embedUrl!}
-                          width="100%"
-                          height="152"
-                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                          loading="lazy"
-                          style={{ borderRadius: 12, border: 'none', display: 'block' }}
-                        />
-                      )}
-                      {/* YouTube embed */}
-                      {embed.type === 'youtube' && (
-                        <iframe
-                          src={embed.embedUrl!}
-                          width="100%"
-                          height="200"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          loading="lazy"
-                          style={{ border: 'none', display: 'block', borderRadius: 12 }}
-                        />
-                      )}
-                      {/* Description + plain link fallback */}
-                      {(item.description || (item.link && embed.type === null)) && (
-                        <div className="p-3" style={{ background: 'rgba(25,0,50,0.8)' }}>
-                          {item.description && (
-                            <p className="text-xs leading-relaxed mb-2" style={{ color: '#C0A8D8' }}>{item.description}</p>
-                          )}
-                          {item.link && embed.type === null && (
-                            <a href={item.link} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-semibold transition-colors hover:text-white"
-                              style={{ color }}>
-                              Abrir enlace →
-                            </a>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
