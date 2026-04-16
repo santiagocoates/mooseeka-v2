@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Music } from 'lucide-react'
+import { Plus, Pencil, Trash2, Music, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import PortfolioModal, { PortfolioItem } from './PortfolioModal'
 
@@ -27,23 +27,17 @@ const TYPE_COLORS: Record<string, string> = {
   otro:    '#7A6890',
 }
 
-function detectEmbed(url: string): { type: 'spotify' | 'youtube' | null; embedUrl: string | null } {
-  if (!url) return { type: null, embedUrl: null }
+/** Returns YouTube video thumbnail URL, or null if not a YouTube link */
+function getYoutubeThumbnail(url: string): string | null {
+  if (!url) return null
+  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+  if (!match) return null
+  return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
+}
 
-  const spotifyMatch = url.match(/open\.spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/)
-  if (spotifyMatch) {
-    return {
-      type: 'spotify',
-      embedUrl: `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}?utm_source=generator&theme=0`,
-    }
-  }
-
-  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
-  if (ytMatch) {
-    return { type: 'youtube', embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}` }
-  }
-
-  return { type: null, embedUrl: null }
+/** Returns true if the URL is a Spotify link */
+function isSpotifyUrl(url: string): boolean {
+  return /open\.spotify\.com/.test(url)
 }
 
 interface PortfolioSectionProps {
@@ -56,7 +50,6 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
   const [loading, setLoading]     = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<PortfolioItem | null>(null)
-  const [expanded, setExpanded]   = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -68,13 +61,13 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setItems(data.map(row => ({
-          id: row.id,
-          title: row.title,
-          type: row.type,
-          year: row.year ?? '',
-          role: row.role ?? '',
-          cover_url: row.cover_url ?? null,
-          link: row.link ?? '',
+          id:          row.id,
+          title:       row.title,
+          type:        row.type,
+          year:        row.year ?? '',
+          role:        row.role ?? '',
+          cover_url:   row.cover_url ?? null,
+          link:        row.link ?? '',
           description: row.description ?? '',
         })))
         setLoading(false)
@@ -92,11 +85,10 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
     const supabase = createClient()
     await supabase.from('portfolio_items').delete().eq('id', id)
     setItems(prev => prev.filter(i => i.id !== id))
-    if (expanded === id) setExpanded(null)
   }
 
-  function openAdd()                     { setEditing(null);  setModalOpen(true) }
-  function openEdit(item: PortfolioItem) { setEditing(item);  setModalOpen(true) }
+  function openAdd()                     { setEditing(null); setModalOpen(true) }
+  function openEdit(item: PortfolioItem) { setEditing(item); setModalOpen(true) }
 
   if (loading) return null
 
@@ -136,61 +128,64 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
         {items.length > 0 && (
           <div className="grid grid-cols-3 gap-3">
             {items.map(item => {
-              const color      = TYPE_COLORS[item.type] ?? '#7A6890'
-              const isExpanded = expanded === item.id
-              const embed      = detectEmbed(item.link)
+              const color     = TYPE_COLORS[item.type] ?? '#7A6890'
+              const ytThumb   = getYoutubeThumbnail(item.link)
+              const isSpotify = isSpotifyUrl(item.link)
+              // Cover priority: user-uploaded > YouTube auto-thumbnail > placeholder
+              const coverSrc  = item.cover_url ?? ytThumb ?? null
+              const hasLink   = !!item.link
 
               return (
                 <div key={item.id} className="flex flex-col">
-                  {/* Cover or embed — embed replaces cover when expanded */}
-                  {isExpanded && embed.type ? (
-                    <div className="rounded-xl overflow-hidden relative" style={{ border: '1px solid rgba(123,47,255,0.2)' }}>
-                      <button onClick={() => setExpanded(null)}
-                        className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                        style={{ background: 'rgba(0,0,0,0.6)' }}>✕</button>
-                      {embed.type === 'spotify' && (
-                        <iframe
-                          src={embed.embedUrl!}
-                          width="100%"
-                          height="152"
-                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                          loading="lazy"
-                          style={{ borderRadius: 12, border: 'none', display: 'block' }}
-                        />
-                      )}
-                      {embed.type === 'youtube' && (
-                        <iframe
-                          src={embed.embedUrl!}
-                          width="100%"
-                          height="180"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          loading="lazy"
-                          style={{ border: 'none', display: 'block', borderRadius: 12 }}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      onClick={() => setExpanded(isExpanded ? null : item.id)}
-                      className="relative aspect-square rounded-xl overflow-hidden cursor-pointer group"
-                      style={{ background: 'rgba(25,0,50,0.8)', border: `1px solid rgba(123,47,255,0.2)` }}>
-                      {item.cover_url ? (
-                        <img src={item.cover_url} alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center"
-                          style={{ background: `linear-gradient(135deg, ${color}22, rgba(10,0,20,0.8))` }}>
-                          <Music size={28} style={{ color: `${color}88` }} />
-                        </div>
-                      )}
-                      {/* Type badge */}
-                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold"
-                        style={{ background: `${color}dd`, color: '#fff' }}>
-                        {TYPE_LABELS[item.type] ?? item.type}
+                  {/* Cover card */}
+                  <div
+                    onClick={() => { if (hasLink) window.open(item.link, '_blank', 'noopener,noreferrer') }}
+                    className="relative aspect-square rounded-xl overflow-hidden group"
+                    style={{
+                      background: 'rgba(25,0,50,0.8)',
+                      border: `1px solid rgba(123,47,255,0.2)`,
+                      cursor: hasLink ? 'pointer' : 'default',
+                    }}>
+
+                    {coverSrc ? (
+                      <img
+                        src={coverSrc}
+                        alt={item.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"
+                        style={{ background: `linear-gradient(135deg, ${color}22, rgba(10,0,20,0.8))` }}>
+                        <Music size={28} style={{ color: `${color}88` }} />
                       </div>
+                    )}
+
+                    {/* Type badge */}
+                    <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold"
+                      style={{ background: `${color}dd`, color: '#fff' }}>
+                      {TYPE_LABELS[item.type] ?? item.type}
                     </div>
-                  )}
+
+                    {/* Platform badge */}
+                    {(ytThumb || isSpotify) && (
+                      <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold flex items-center gap-1"
+                        style={{ background: 'rgba(0,0,0,0.7)', color: '#fff' }}>
+                        {ytThumb ? '▶ YouTube' : '♫ Spotify'}
+                      </div>
+                    )}
+
+                    {/* Hover overlay — link indicator */}
+                    {hasLink && (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ background: 'rgba(0,0,0,0.45)' }}>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-bold"
+                          style={{ background: 'rgba(139,63,255,0.85)' }}>
+                          <ExternalLink size={11} />
+                          Abrir
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Title + meta */}
                   <p className="text-white text-xs font-semibold mt-1.5 truncate">{item.title}</p>
@@ -200,23 +195,7 @@ export default function PortfolioSection({ profileId, isOwner }: PortfolioSectio
                     </p>
                   )}
 
-                  {/* Description + plain link fallback when expanded without embed */}
-                  {isExpanded && embed.type === null && (item.description || item.link) && (
-                    <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(25,0,50,0.8)', border: '1px solid rgba(123,47,255,0.2)' }}>
-                      {item.description && (
-                        <p className="text-xs leading-relaxed mb-2" style={{ color: '#C0A8D8' }}>{item.description}</p>
-                      )}
-                      {item.link && (
-                        <a href={item.link} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-semibold transition-colors hover:text-white"
-                          style={{ color }}>
-                          Abrir enlace →
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Edit / Delete — always visible for owner */}
+                  {/* Edit / Delete */}
                   {isOwner && (
                     <div className="flex gap-1.5 mt-1.5">
                       <button onClick={() => openEdit(item)}
