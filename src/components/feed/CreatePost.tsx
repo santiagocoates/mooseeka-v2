@@ -48,6 +48,7 @@ interface MediaState {
   youtubeId?: string
   spotifyEmbed?: string
   audioUrl?: string
+  audioFile?: File
   imageUrl?: string
   imageFile?: File
   fileName?: string
@@ -269,7 +270,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
   }
   function handleInlineAudio(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    setInlineMedia({ type: 'audio', url: '', audioUrl: URL.createObjectURL(f), fileName: f.name })
+    setInlineMedia({ type: 'audio', url: '', audioUrl: URL.createObjectURL(f), audioFile: f, fileName: f.name })
     setShowLinkInput(false)
   }
   function handleModalImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -278,7 +279,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
   }
   function handleModalAudio(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    setMedia({ type: 'audio', url: '', audioUrl: URL.createObjectURL(f), fileName: f.name }); setMediaTab(null)
+    setMedia({ type: 'audio', url: '', audioUrl: URL.createObjectURL(f), audioFile: f, fileName: f.name }); setMediaTab(null)
   }
 
   async function uploadImageFile(file: File, profileId: string): Promise<string | null> {
@@ -291,16 +292,31 @@ export default function CreatePost({ onPost }: CreatePostProps) {
     return data.publicUrl
   }
 
+  async function uploadFile(file: File, profileId: string, folder: string): Promise<string | null> {
+    const supabase = createClient()
+    const ext  = file.name.split('.').pop()
+    const path = `${profileId}/${folder}-${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('posts').upload(path, file, { upsert: true })
+    if (error) return null
+    const { data } = supabase.storage.from('posts').getPublicUrl(path)
+    return data.publicUrl
+  }
+
   async function publishPost(type: string, text: string, mediaState: MediaState): Promise<PostData | null> {
     if (!currentUser) return null
     const supabase = createClient()
 
     let image_url: string | null = null
+    let audio_url: string | null = null
+    let audio_name: string | null = null
     let link: string | null = null
 
     if (mediaState.type === 'image' && mediaState.imageFile) {
-      image_url = await uploadImageFile(mediaState.imageFile, currentUser.id)
-    } else if (mediaState.type === 'youtube' || mediaState.type === 'spotify' || mediaState.type === 'link') {
+      image_url = await uploadFile(mediaState.imageFile, currentUser.id, 'img')
+    } else if (mediaState.type === 'audio' && mediaState.audioFile) {
+      audio_url  = await uploadFile(mediaState.audioFile, currentUser.id, 'audio')
+      audio_name = mediaState.fileName ?? null
+    } else if (['youtube', 'spotify', 'link'].includes(mediaState.type ?? '')) {
       link = mediaState.url
     }
 
@@ -310,6 +326,8 @@ export default function CreatePost({ onPost }: CreatePostProps) {
       content:    text.trim(),
       link,
       image_url,
+      audio_url,
+      audio_name,
     }
 
     const { data, error } = await supabase.from('posts').insert(row).select().single()
@@ -337,10 +355,12 @@ export default function CreatePost({ onPost }: CreatePostProps) {
         initials: currentUser.name[0]?.toUpperCase() ?? '?',
         username: currentUser.username,
       },
-      time:    'ahora',
-      type:    postDataType,
-      content: text.trim(),
-      image:   image_url ?? undefined,
+      time:       'ahora',
+      type:       postDataType,
+      content:    text.trim(),
+      image:      image_url ?? undefined,
+      audio_url:  audio_url ?? undefined,
+      audio_name: audio_name ?? undefined,
       embed,
       likes:    0,
       comments: 0,

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const ROLES = [
@@ -16,6 +17,7 @@ const ROLES = [
 ]
 
 export default function SignupPage() {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
@@ -48,10 +50,11 @@ export default function SignupPage() {
       password,
       options: {
         data: { name, roles: selectedRoles },
-        emailRedirectTo: `${window.location.origin}/home`,
+        emailRedirectTo: `${window.location.origin}/onboarding`,
       },
     })
     if (error) { alert(error.message); setLoading(false) }
+    else { router.push('/onboarding') }
   }
 
   return (

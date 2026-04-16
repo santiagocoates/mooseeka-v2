@@ -1,46 +1,90 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, ExternalLink } from 'lucide-react'
 
-const WAVEFORM = [45,70,35,85,55,90,40,75,60,95,30,65,80,50,70,40,88,55,72,38,92,48,67,82,44,76,58,91,36,69,84,52,78,42,88,61,74,46,83,57]
+/* ── Audio Player ─────────────────────────────────── */
+function AudioPlayer({ src, fileName }: { src: string; fileName?: string }) {
+  const audioRef   = useRef<HTMLAudioElement>(null)
+  const [playing,  setPlaying]  = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [current,  setCurrent]  = useState(0)
 
-interface AudioPlayerProps {
-  title: string
-  duration: string
-}
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const onTime  = () => { setCurrent(audio.currentTime); setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0) }
+    const onMeta  = () => setDuration(audio.duration)
+    const onEnded = () => setPlaying(false)
+    audio.addEventListener('timeupdate', onTime)
+    audio.addEventListener('loadedmetadata', onMeta)
+    audio.addEventListener('ended', onEnded)
+    return () => {
+      audio.removeEventListener('timeupdate', onTime)
+      audio.removeEventListener('loadedmetadata', onMeta)
+      audio.removeEventListener('ended', onEnded)
+    }
+  }, [])
 
-function AudioPlayer({ title, duration }: AudioPlayerProps) {
-  const [playing, setPlaying] = useState(false)
-  const [progress, setProgress] = useState(30)
+  function togglePlay() {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) { audio.pause(); setPlaying(false) }
+    else         { audio.play();  setPlaying(true)  }
+  }
+
+  function seek(e: React.MouseEvent<HTMLDivElement>) {
+    const audio = audioRef.current
+    if (!audio || !duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pct  = (e.clientX - rect.left) / rect.width
+    audio.currentTime = pct * duration
+  }
+
+  function fmt(s: number) {
+    if (!s || isNaN(s)) return '0:00'
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  const BARS = [45,70,35,85,55,90,40,75,60,95,30,65,80,50,70,40,88,55,72,38,92,48,67,82,44,76,58,91,36,69,84,52,78,42,88,61,74,46,83,57]
 
   return (
-    <div className="rounded-xl p-4 mt-3" style={{ background: 'rgba(10,0,20,0.8)', border: '1px solid rgba(123,47,255,0.2)' }}>
+    <div className="rounded-xl p-4 mt-3" style={{ background: 'rgba(10,0,20,0.8)', border: '1px solid rgba(123,47,255,0.25)' }}>
+      <audio ref={audioRef} src={src} preload="metadata" />
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => setPlaying(!playing)}
-          className="w-10 h-10 rounded-full gradient-magenta flex items-center justify-center shrink-0 hover:opacity-90 transition-all"
-        >
-          {playing ? <Pause size={16} fill="white" className="text-white" /> : <Play size={16} fill="white" className="text-white ml-0.5" />}
+        <button onClick={togglePlay}
+          className="w-11 h-11 rounded-full gradient-magenta flex items-center justify-center shrink-0 hover:opacity-90 transition-all">
+          {playing
+            ? <Pause size={18} fill="white" className="text-white" />
+            : <Play  size={18} fill="white" className="text-white ml-0.5" />}
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-white text-sm font-medium truncate">{title}</p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <div className="flex-1 h-1 bg-white/10 rounded-full relative">
-              <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-[#8b5cf6] to-[#e91e8c] rounded-full transition-all"
-                style={{ width: `${progress}%` }} />
+          {fileName && (
+            <p className="text-white text-xs font-semibold truncate mb-1.5 flex items-center gap-1.5">
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: 'rgba(139,63,255,0.3)', color: '#A855F7' }}>INÉDITO</span>
+              {fileName.replace(/\.[^/.]+$/, '')}
+            </p>
+          )}
+          {/* Waveform */}
+          <div className="flex items-end gap-0.5 h-7 cursor-pointer mb-1.5" onClick={seek}>
+            {BARS.map((h, i) => {
+              const filled = i < (progress / 100) * BARS.length
+              return (
+                <div key={i} className="flex-1 rounded-sm transition-colors"
+                  style={{ height: `${h}%`, background: filled ? '#A855F7' : 'rgba(255,255,255,0.12)' }} />
+              )
+            })}
+          </div>
+          {/* Progress bar + time */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1 rounded-full cursor-pointer overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }} onClick={seek}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'linear-gradient(to right, #8B3FFF, #FF1A8C)' }} />
             </div>
-            <span className="text-[#b0b0b0] text-xs shrink-0">{duration}</span>
-          </div>
-          {/* Waveform visual — fixed heights to avoid hydration mismatch */}
-          <div className="flex items-end gap-0.5 mt-2 h-6">
-            {WAVEFORM.map((h, i) => (
-              <div key={i}
-                className={`flex-1 rounded-sm transition-all ${i < progress * 0.4 ? 'bg-[#8b5cf6]' : 'bg-white/15'}`}
-                style={{ height: `${h}%` }}
-              />
-            ))}
+            <span className="text-xs shrink-0 tabular-nums" style={{ color: '#7A6890' }}>{fmt(current)} / {fmt(duration)}</span>
           </div>
         </div>
       </div>
@@ -48,36 +92,7 @@ function AudioPlayer({ title, duration }: AudioPlayerProps) {
   )
 }
 
-interface ServiceCardEmbedProps {
-  title: string
-  price: string
-  category: string
-  rating: number
-}
-
-function ServiceCardEmbed({ title, price, category, rating }: ServiceCardEmbedProps) {
-  return (
-    <div className="rounded-xl p-4 mt-3 flex items-center justify-between" style={{ background: 'rgba(10,0,20,0.8)', border: '1px solid rgba(123,47,255,0.2)' }}>
-      <div>
-        <p className="text-[#b0b0b0] text-xs uppercase tracking-wider mb-1">{category}</p>
-        <p className="text-white font-medium text-sm">{title}</p>
-        <div className="flex items-center gap-1 mt-1">
-          <span className="text-yellow-400 text-xs">★</span>
-          <span className="text-[#b0b0b0] text-xs">{rating} · </span>
-          <span className="text-white text-sm font-semibold">{price}</span>
-        </div>
-      </div>
-      <button className="gradient-magenta text-white text-xs font-semibold px-4 py-2 rounded-full hover:opacity-90 transition-all flex items-center gap-1.5">
-        Ver <ExternalLink size={12} />
-      </button>
-    </div>
-  )
-}
-
-function getDomain(url: string) {
-  try { return new URL(url).hostname.replace('www.', '') } catch { return url }
-}
-
+/* ── PostData interface ───────────────────────────── */
 export interface PostData {
   id: string
   author: {
@@ -85,15 +100,14 @@ export interface PostData {
     role: string
     avatar?: string
     initials: string
-    avatarGradient?: string
     username?: string
   }
   time: string
   content: string
   type: 'work' | 'service' | 'achievement' | 'regular'
   image?: string
-  audio?: { title: string; duration: string }
-  service?: { title: string; price: string; category: string; rating: number }
+  audio_url?: string
+  audio_name?: string
   embed?: {
     type: 'youtube' | 'spotify' | 'link'
     url: string
@@ -105,8 +119,26 @@ export interface PostData {
   liked?: boolean
 }
 
+const TYPE_COLORS: Record<string, string> = {
+  work:        '#8b5cf6',
+  service:     '#e91e8c',
+  achievement: '#f59e0b',
+  regular:     '#06b6d4',
+}
+const TYPE_LABELS: Record<string, string> = {
+  work:        'Lanzamiento',
+  service:     'Servicio',
+  achievement: 'Logro',
+  regular:     'Búsqueda',
+}
+
+function getDomain(url: string) {
+  try { return new URL(url).hostname.replace('www.', '') } catch { return url }
+}
+
+/* ── PostCard ─────────────────────────────────────── */
 export default function PostCard({ post }: { post: PostData }) {
-  const [liked, setLiked] = useState(post.liked ?? false)
+  const [liked,     setLiked]     = useState(post.liked ?? false)
   const [likeCount, setLikeCount] = useState(post.likes)
 
   function toggleLike() {
@@ -114,24 +146,16 @@ export default function PostCard({ post }: { post: PostData }) {
     setLikeCount(prev => liked ? prev - 1 : prev + 1)
   }
 
-  const typeColors: Record<string, string> = {
-    work: '#8b5cf6',
-    service: '#e91e8c',
-    achievement: '#f59e0b',
-    regular: '#06b6d4',
-  }
-  const typeLabels: Record<string, string> = {
-    work: 'Trabajo',
-    service: 'Servicio',
-    achievement: 'Logro',
-    regular: 'Post',
-  }
+  const color = TYPE_COLORS[post.type] ?? '#8b5cf6'
+  const label = TYPE_LABELS[post.type] ?? 'Post'
 
   return (
     <article className="rounded-2xl p-5 card-shadow" style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
+
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
+          {/* Avatar */}
           {post.author.username ? (
             <Link href={`/${post.author.username}`} className="shrink-0">
               {post.author.avatar ? (
@@ -155,8 +179,9 @@ export default function PostCard({ post }: { post: PostData }) {
               {post.author.initials}
             </div>
           )}
+
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {post.author.username ? (
                 <Link href={`/${post.author.username}`} className="text-white font-semibold text-sm hover:underline">
                   {post.author.name}
@@ -165,72 +190,63 @@ export default function PostCard({ post }: { post: PostData }) {
                 <span className="text-white font-semibold text-sm">{post.author.name}</span>
               )}
               {post.type !== 'regular' && (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: `${typeColors[post.type]}20`, color: typeColors[post.type] }}>
-                  {typeLabels[post.type]}
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: `${color}20`, color }}>
+                  {label}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs" style={{ color: '#7A6890' }}>{post.author.role}</span>
-              <span className="text-xs" style={{ color: '#7A6890' }}>·</span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {post.author.role && <span className="text-xs" style={{ color: '#7A6890' }}>{post.author.role}</span>}
+              {post.author.role && <span className="text-xs" style={{ color: '#7A6890' }}>·</span>}
               <span className="text-xs" style={{ color: '#7A6890' }}>{post.time}</span>
             </div>
           </div>
         </div>
-        <button className="hover:text-white transition-colors p-1" style={{ color: '#7A6890' }}>
+        <button className="hover:text-white transition-colors p-1 shrink-0" style={{ color: '#7A6890' }}>
           <MoreHorizontal size={18} />
         </button>
       </div>
 
-      {/* Content */}
-      <p className="text-sm leading-relaxed" style={{ color: '#C0A8D8' }}>{post.content}</p>
+      {/* Text content */}
+      <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: '#C0A8D8' }}>{post.content}</p>
 
       {/* Image */}
       {post.image && (
         <div className="mt-3 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(123,47,255,0.2)' }}>
-          <img src={post.image} alt="" className="w-full object-cover" style={{ maxHeight: 320 }} />
+          <img src={post.image} alt="" className="w-full object-cover" style={{ maxHeight: 360 }} />
         </div>
       )}
 
-      {/* Embedded audio */}
-      {post.audio && <AudioPlayer title={post.audio.title} duration={post.audio.duration} />}
-
-      {/* Embedded service */}
-      {post.service && (
-        <ServiceCardEmbed
-          title={post.service.title}
-          price={post.service.price}
-          category={post.service.category}
-          rating={post.service.rating}
-        />
+      {/* Audio player (unreleased music) */}
+      {post.audio_url && (
+        <AudioPlayer src={post.audio_url} fileName={post.audio_name} />
       )}
 
-      {/* Embedded YouTube / Spotify */}
+      {/* YouTube embed — full iframe */}
       {post.embed?.type === 'youtube' && post.embed.youtubeId && (
-        <div className="relative rounded-xl overflow-hidden mt-3" style={{ border: '1px solid rgba(123,47,255,0.25)' }}>
-          <a href={post.embed.url} target="_blank" rel="noopener noreferrer">
-            <img src={`https://img.youtube.com/vi/${post.embed.youtubeId}/hqdefault.jpg`}
-              alt="YouTube" className="w-full h-44 object-cover opacity-80" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,0,0,0.9)' }}>
-                <Play size={22} fill="white" className="text-white ml-1" />
-              </div>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 px-3 py-2"
-              style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)' }}>
-              <span className="text-xs font-bold text-red-400">YouTube</span>
-            </div>
-          </a>
+        <div className="relative rounded-xl overflow-hidden mt-3" style={{ border: '1px solid rgba(123,47,255,0.25)', paddingTop: '56.25%' }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${post.embed.youtubeId}?rel=0`}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            loading="lazy"
+            style={{ border: 'none' }}
+          />
         </div>
       )}
+
+      {/* Spotify embed */}
       {post.embed?.type === 'spotify' && post.embed.spotifyEmbed && (
         <div className="mt-3 rounded-xl overflow-hidden">
           <iframe src={post.embed.spotifyEmbed} width="100%" height="152"
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy" className="block" style={{ borderRadius: '12px' }} />
+            loading="lazy" className="block" style={{ borderRadius: '12px', border: 'none' }} />
         </div>
       )}
+
+      {/* Plain link */}
       {post.embed?.type === 'link' && (
         <a href={post.embed.url} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-3 p-3 mt-3 rounded-xl hover:bg-white/5 transition-colors"
