@@ -1,30 +1,24 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
-  Briefcase, Headphones, Package, BookOpen, X,
-  ChevronRight, ArrowLeft, DollarSign, Clock, Tag,
-  Play, Upload, FileAudio, ExternalLink, Trash2,
-  ImageIcon, Music, Video, Send
+  X, ChevronRight, ArrowLeft, Play,
+  Upload, FileAudio, ExternalLink, Trash2,
+  ImageIcon, Music, Video, Send, Link2
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import { PostData } from './PostCard'
 
-/* ── Types ─────────────────────────────────────────── */
 const POST_TYPES = [
-  { id: 'work',    icon: Briefcase,  label: 'Trabajo',  description: 'Comparte un proyecto completado o en progreso', color: '#8B3FFF', bg: 'rgba(139,63,255,0.12)', border: 'rgba(139,63,255,0.35)' },
-  { id: 'service', icon: Headphones, label: 'Servicio', description: 'Anuncia un nuevo servicio en el marketplace',   color: '#FF1A8C', bg: 'rgba(255,26,140,0.12)', border: 'rgba(255,26,140,0.35)' },
-  { id: 'product', icon: Package,    label: 'Producto', description: 'Vende samples, presets, beats o merch',         color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',  border: 'rgba(6,182,212,0.35)'  },
-  { id: 'course',  icon: BookOpen,   label: 'Curso',    description: 'Comparte conocimiento y enseña a otros',        color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)' },
-]
-
-const SERVICE_CATEGORIES = [
-  'Producción musical','Mixing','Mastering','Composición',
-  'Grabación','Diseño gráfico','Video / Clip','Marketing',
-  'Management','Legal','Educación','Otro',
+  { id: 'lanzamiento', label: 'Lanzamiento', emoji: '🚀', desc: 'Nuevo single, EP, álbum o beat',         color: '#8B3FFF', bg: 'rgba(139,63,255,0.12)', border: 'rgba(139,63,255,0.35)' },
+  { id: 'logro',       label: 'Logro',       emoji: '🏆', desc: 'Un hito, reconocimiento o meta',          color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.35)'  },
+  { id: 'video',       label: 'Video',       emoji: '🎬', desc: 'Videoclip, live session o BTS',           color: '#FF1A8C', bg: 'rgba(255,26,140,0.12)',  border: 'rgba(255,26,140,0.35)'  },
+  { id: 'busqueda',    label: 'Búsqueda',    emoji: '🔍', desc: 'Buscas músico, productor o colaborador',  color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   border: 'rgba(6,182,212,0.35)'   },
 ]
 
 const CHAR_LIMIT = 500
 
-/* ── Link helpers ─────────────────────────────────── */
 function getYouTubeId(url: string) {
   const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/)
   return m ? m[1] : null
@@ -40,6 +34,13 @@ function detectLinkType(url: string): 'youtube' | 'spotify' | 'other' | null {
   if (url.startsWith('http')) return 'other'
   return null
 }
+function extractFirstUrl(text: string): string | null {
+  const m = text.match(/(https?:\/\/[^\s]+)/)
+  return m ? m[1].replace(/[.,;!?)]+$/, '') : null
+}
+function getDomain(url: string) {
+  try { return new URL(url).hostname.replace('www.', '') } catch { return url }
+}
 
 interface MediaState {
   type: 'youtube' | 'spotify' | 'audio' | 'image' | 'link' | null
@@ -48,17 +49,9 @@ interface MediaState {
   spotifyEmbed?: string
   audioUrl?: string
   imageUrl?: string
+  imageFile?: File
   fileName?: string
   autoDetected?: boolean
-}
-
-function extractFirstUrl(text: string): string | null {
-  const m = text.match(/(https?:\/\/[^\s]+)/)
-  return m ? m[1].replace(/[.,;!?)]+$/, '') : null
-}
-
-function getDomain(url: string) {
-  try { return new URL(url).hostname.replace('www.', '') } catch { return url }
 }
 
 function autoDetectMedia(url: string): MediaState | null {
@@ -75,6 +68,14 @@ function autoDetectMedia(url: string): MediaState | null {
   return null
 }
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1)  return 'ahora'
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h`
+}
+
 /* ── MediaPreview ─────────────────────────────────── */
 function MediaPreview({ media, onRemove }: { media: MediaState; onRemove: () => void }) {
   if (!media.type) return null
@@ -85,7 +86,6 @@ function MediaPreview({ media, onRemove }: { media: MediaState; onRemove: () => 
         style={{ background: 'rgba(0,0,0,0.75)', color: '#fff' }}>
         <Trash2 size={13} />
       </button>
-
       {media.type === 'youtube' && media.youtubeId && (
         <div style={{ background: '#000' }}>
           <div className="relative">
@@ -98,21 +98,16 @@ function MediaPreview({ media, onRemove }: { media: MediaState; onRemove: () => 
             </div>
             <div className="absolute bottom-0 left-0 right-0 px-3 py-2"
               style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)' }}>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-red-400">YouTube</span>
-                <span className="text-white text-xs truncate opacity-80">{media.url}</span>
-              </div>
+              <span className="text-xs font-bold text-red-400">YouTube</span>
             </div>
           </div>
         </div>
       )}
-
       {media.type === 'spotify' && media.spotifyEmbed && (
         <iframe src={media.spotifyEmbed} width="100%" height="152"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy" className="block" style={{ borderRadius: '12px' }} />
       )}
-
       {media.type === 'audio' && (
         <div className="flex items-center gap-3 p-3" style={{ background: 'rgba(139,63,255,0.1)' }}>
           <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 gradient-magenta">
@@ -124,17 +119,14 @@ function MediaPreview({ media, onRemove }: { media: MediaState; onRemove: () => 
           </div>
         </div>
       )}
-
       {media.type === 'image' && media.imageUrl && (
         <img src={media.imageUrl} alt="preview" className="w-full max-h-64 object-cover" />
       )}
-
       {media.type === 'link' && (
         <a href={media.url} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors"
           style={{ background: 'rgba(255,255,255,0.04)' }}>
-          <img
-            src={`https://www.google.com/s2/favicons?domain=${getDomain(media.url)}&sz=32`}
+          <img src={`https://www.google.com/s2/favicons?domain=${getDomain(media.url)}&sz=32`}
             alt="" className="w-6 h-6 rounded shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold truncate" style={{ color: '#C0A8D8' }}>{getDomain(media.url)}</p>
@@ -191,33 +183,38 @@ function LinkInput({ onAdd }: { onAdd: (m: MediaState) => void }) {
 }
 
 /* ── Main ─────────────────────────────────────────── */
-export default function CreatePost() {
-  // Inline composer state
-  const [inlineOpen, setInlineOpen]   = useState(false)
-  const [inlineText, setInlineText]   = useState('')
-  const [inlineMedia, setInlineMedia] = useState<MediaState>({ type: null, url: '' })
-  const [showLinkInput, setShowLinkInput] = useState(false)
+interface CreatePostProps {
+  onPost?: (post: PostData) => void
+}
+
+export default function CreatePost({ onPost }: CreatePostProps) {
+  const currentUser = useCurrentUser()
+
+  // Inline composer
+  const [inlineOpen,     setInlineOpen]     = useState(false)
+  const [inlineText,     setInlineText]     = useState('')
+  const [inlineMedia,    setInlineMedia]    = useState<MediaState>({ type: null, url: '' })
+  const [inlineType,     setInlineType]     = useState('lanzamiento')
+  const [showLinkInput,  setShowLinkInput]  = useState(false)
   const [inlineDismissed, setInlineDismissed] = useState<string | null>(null)
+  const [publishing,     setPublishing]     = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
 
-  // Full modal state
-  const [modalOpen, setModalOpen]     = useState(false)
-  const [step, setStep]               = useState<'type' | 'form'>('type')
-  const [selectedType, setSelectedType] = useState<string | null>(null)
-  const [content, setContent]         = useState('')
-  const [media, setMedia]             = useState<MediaState>({ type: null, url: '' })
-  const [mediaTab, setMediaTab]       = useState<'link' | null>(null)
+  // Full modal
+  const [modalOpen,      setModalOpen]      = useState(false)
+  const [step,           setStep]           = useState<'type' | 'form'>('type')
+  const [selectedType,   setSelectedType]   = useState<string | null>(null)
+  const [content,        setContent]        = useState('')
+  const [media,          setMedia]          = useState<MediaState>({ type: null, url: '' })
+  const [mediaTab,       setMediaTab]       = useState<'link' | null>(null)
   const [modalDismissed, setModalDismissed] = useState<string | null>(null)
+  const [modalPublishing, setModalPublishing] = useState(false)
+  const [modalError,     setModalError]     = useState<string | null>(null)
 
-  // Service / product / course fields
-  const [svcTitle, setSvcTitle] = useState(''); const [svcCat, setSvcCat] = useState('')
-  const [svcPrice, setSvcPrice] = useState(''); const [svcDays, setSvcDays] = useState('')
-  const [prdTitle, setPrdTitle] = useState(''); const [prdPrice, setPrdPrice] = useState('')
-  const [crsTitle, setCrsTitle] = useState(''); const [crsDur, setCrsDur] = useState(''); const [crsPrx, setCrsPrx] = useState('')
-
-  const audioRef  = useRef<HTMLInputElement>(null)
-  const imageRef  = useRef<HTMLInputElement>(null)
   const iaudioRef = useRef<HTMLInputElement>(null)
   const iimageRef = useRef<HTMLInputElement>(null)
+  const audioRef  = useRef<HTMLInputElement>(null)
+  const imageRef  = useRef<HTMLInputElement>(null)
 
   const modalType = POST_TYPES.find(t => t.id === selectedType)
 
@@ -227,15 +224,14 @@ export default function CreatePost() {
   function closeModal() {
     setModalOpen(false)
     setTimeout(() => {
-      setStep('type'); setSelectedType(null); setContent(''); setMedia({ type: null, url: '' }); setMediaTab(null)
-      setModalDismissed(null)
-      setSvcTitle(''); setSvcCat(''); setSvcPrice(''); setSvcDays('')
-      setPrdTitle(''); setPrdPrice(''); setCrsTitle(''); setCrsDur(''); setCrsPrx('')
+      setStep('type'); setSelectedType(null); setContent('')
+      setMedia({ type: null, url: '' }); setMediaTab(null)
+      setModalDismissed(null); setModalError(null)
     }, 200)
   }
   function closeInline() {
     setInlineOpen(false); setInlineText(''); setInlineMedia({ type: null, url: '' })
-    setShowLinkInput(false); setInlineDismissed(null)
+    setShowLinkInput(false); setInlineDismissed(null); setError(null)
   }
 
   function handleInlineTextChange(text: string) {
@@ -266,55 +262,166 @@ export default function CreatePost() {
     if (media.autoDetected) setMedia({ type: null, url: '' })
   }
 
-  function handleInlineAudio(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return
-    const url = URL.createObjectURL(f)
-    setInlineMedia({ type: 'audio', url, audioUrl: url, fileName: f.name })
-    setShowLinkInput(false)
-  }
   function handleInlineImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    const url = URL.createObjectURL(f)
-    setInlineMedia({ type: 'image', url, imageUrl: url, fileName: f.name })
+    setInlineMedia({ type: 'image', url: '', imageUrl: URL.createObjectURL(f), imageFile: f, fileName: f.name })
     setShowLinkInput(false)
   }
-  function handleModalAudio(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleInlineAudio(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    const url = URL.createObjectURL(f)
-    setMedia({ type: 'audio', url, audioUrl: url, fileName: f.name }); setMediaTab(null)
+    setInlineMedia({ type: 'audio', url: '', audioUrl: URL.createObjectURL(f), fileName: f.name })
+    setShowLinkInput(false)
   }
   function handleModalImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    const url = URL.createObjectURL(f)
-    setMedia({ type: 'image', url, imageUrl: url, fileName: f.name }); setMediaTab(null)
+    setMedia({ type: 'image', url: '', imageUrl: URL.createObjectURL(f), imageFile: f, fileName: f.name }); setMediaTab(null)
   }
+  function handleModalAudio(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return
+    setMedia({ type: 'audio', url: '', audioUrl: URL.createObjectURL(f), fileName: f.name }); setMediaTab(null)
+  }
+
+  async function uploadImageFile(file: File, profileId: string): Promise<string | null> {
+    const supabase = createClient()
+    const ext  = file.name.split('.').pop()
+    const path = `${profileId}/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('posts').upload(path, file, { upsert: true })
+    if (error) return null
+    const { data } = supabase.storage.from('posts').getPublicUrl(path)
+    return data.publicUrl
+  }
+
+  async function publishPost(type: string, text: string, mediaState: MediaState): Promise<PostData | null> {
+    if (!currentUser) return null
+    const supabase = createClient()
+
+    let image_url: string | null = null
+    let link: string | null = null
+
+    if (mediaState.type === 'image' && mediaState.imageFile) {
+      image_url = await uploadImageFile(mediaState.imageFile, currentUser.id)
+    } else if (mediaState.type === 'youtube' || mediaState.type === 'spotify' || mediaState.type === 'link') {
+      link = mediaState.url
+    }
+
+    const row = {
+      profile_id: currentUser.id,
+      type,
+      content:    text.trim(),
+      link,
+      image_url,
+    }
+
+    const { data, error } = await supabase.from('posts').insert(row).select().single()
+    if (error) throw error
+    if (!data) return null
+
+    const postDataType: PostData['type'] =
+      type === 'logro'    ? 'achievement' :
+      type === 'busqueda' ? 'regular'     : 'work'
+
+    let embed: PostData['embed'] | undefined
+    if (link) {
+      const ytId = mediaState.youtubeId
+      if (ytId) embed = { type: 'youtube', url: link, youtubeId: ytId }
+      else if (mediaState.spotifyEmbed) embed = { type: 'spotify', url: link, spotifyEmbed: mediaState.spotifyEmbed }
+      else embed = { type: 'link', url: link }
+    }
+
+    return {
+      id: data.id,
+      author: {
+        name:     currentUser.name,
+        role:     '',
+        avatar:   currentUser.avatar_url ?? undefined,
+        initials: currentUser.name[0]?.toUpperCase() ?? '?',
+        username: currentUser.username,
+      },
+      time:    'ahora',
+      type:    postDataType,
+      content: text.trim(),
+      image:   image_url ?? undefined,
+      embed,
+      likes:    0,
+      comments: 0,
+    }
+  }
+
+  async function handleInlinePublish() {
+    if (!inlineText.trim() || publishing) return
+    setPublishing(true); setError(null)
+    try {
+      const post = await publishPost(inlineType, inlineText, inlineMedia)
+      if (post) { onPost?.(post); closeInline() }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? 'Error al publicar'
+      setError(msg)
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  async function handleModalPublish() {
+    if (!content.trim() || !selectedType || modalPublishing) return
+    setModalPublishing(true); setModalError(null)
+    try {
+      const post = await publishPost(selectedType, content, media)
+      if (post) { onPost?.(post); closeModal() }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? 'Error al publicar'
+      setModalError(msg)
+    } finally {
+      setModalPublishing(false)
+    }
+  }
+
+  const selectedPostType = POST_TYPES.find(t => t.id === inlineType)
 
   return (
     <>
-      {/* ════════════════════════════════════════════
-          INLINE COMPOSER (estilo de la imagen)
-      ════════════════════════════════════════════ */}
+      {/* ════ INLINE COMPOSER ════ */}
       <div className="rounded-2xl overflow-hidden card-shadow"
         style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
 
-        {/* Textarea area */}
         <div className="p-4">
           <div className="flex gap-3">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-bold gradient-magenta mt-0.5">
-              TU
-            </div>
+            {/* Avatar */}
+            {currentUser?.avatar_url ? (
+              <img src={currentUser.avatar_url} alt={currentUser.name}
+                className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5"
+                style={{ border: '2px solid rgba(123,47,255,0.4)' }} />
+            ) : (
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-bold gradient-magenta mt-0.5">
+                {currentUser?.name?.[0]?.toUpperCase() ?? '?'}
+              </div>
+            )}
             <textarea
               value={inlineText}
               onChange={e => handleInlineTextChange(e.target.value.slice(0, CHAR_LIMIT))}
               onFocus={() => setInlineOpen(true)}
-              placeholder="Escribe tu publicación, comparte un enlace o menciona usuarios con @username..."
+              placeholder="Comparte un lanzamiento, logro, video o búsqueda..."
               rows={inlineOpen ? 4 : 2}
               className="flex-1 bg-transparent text-white placeholder-[#7A6890] resize-none focus:outline-none text-sm leading-relaxed transition-all"
               style={{ minHeight: inlineOpen ? '96px' : '44px' }}
             />
           </div>
 
-          {/* Media preview dentro del composer */}
+          {/* Type selector — visible when open */}
+          {inlineOpen && (
+            <div className="flex gap-1.5 mt-3 ml-12 flex-wrap">
+              {POST_TYPES.map(t => (
+                <button key={t.id} onClick={() => setInlineType(t.id)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all"
+                  style={inlineType === t.id
+                    ? { background: t.bg, color: t.color, border: `1px solid ${t.border}` }
+                    : { background: 'rgba(255,255,255,0.04)', color: '#7A6890', border: '1px solid rgba(123,47,255,0.15)' }}>
+                  {t.emoji} {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Media preview */}
           {inlineMedia.type && (
             <div className="ml-12">
               <MediaPreview media={inlineMedia} onRemove={() => {
@@ -324,31 +431,33 @@ export default function CreatePost() {
             </div>
           )}
 
-          {/* Link input inline */}
           {showLinkInput && !inlineMedia.type && (
             <div className="ml-12">
               <LinkInput onAdd={m => { setInlineMedia(m); setShowLinkInput(false) }} />
             </div>
           )}
+
+          {error && (
+            <p className="text-xs mt-2 ml-12 px-3 py-2 rounded-lg font-medium"
+              style={{ background: 'rgba(255,50,50,0.1)', color: '#ff6b6b', border: '1px solid rgba(255,50,50,0.25)' }}>
+              {error}
+            </p>
+          )}
         </div>
 
-        {/* Divider */}
         <div style={{ height: '1px', background: 'rgba(123,47,255,0.15)' }} />
 
-        {/* Bottom toolbar */}
         <div className="flex items-center justify-between px-4 py-3">
-          {/* Media icons */}
           <div className="flex items-center gap-1">
-            <ToolbarIcon icon={ImageIcon} label="Imagen"   color="#8B3FFF" onClick={() => iimageRef.current?.click()} />
-            <ToolbarIcon icon={Music}     label="Audio"    color="#FF1A8C" onClick={() => iaudioRef.current?.click()} />
-            <ToolbarIcon icon={Video}     label="Video / Link" color="#06b6d4"
+            <ToolbarIcon icon={ImageIcon} label="Imagen"       color="#8B3FFF" onClick={() => iimageRef.current?.click()} />
+            <ToolbarIcon icon={Music}     label="Audio"        color="#FF1A8C" onClick={() => iaudioRef.current?.click()} />
+            <ToolbarIcon icon={Link2}     label="Enlace"       color="#06b6d4"
               onClick={() => { setInlineOpen(true); setShowLinkInput(v => !v) }}
               active={showLinkInput} />
-            <input ref={iaudioRef} type="file" accept="audio/*" className="hidden" onChange={handleInlineAudio} />
-            <input ref={iimageRef} type="file" accept="image/*" className="hidden" onChange={handleInlineImage} />
+            <input ref={iaudioRef} type="file" accept="audio/*"  className="hidden" onChange={handleInlineAudio} />
+            <input ref={iimageRef} type="file" accept="image/*"  className="hidden" onChange={handleInlineImage} />
           </div>
 
-          {/* Actions */}
           {inlineOpen ? (
             <div className="flex items-center gap-2">
               <button onClick={closeInline}
@@ -357,21 +466,20 @@ export default function CreatePost() {
                 Cancelar
               </button>
               <button
-                disabled={!inlineText.trim()}
-                onClick={closeInline}
+                disabled={!inlineText.trim() || publishing}
+                onClick={handleInlinePublish}
                 className="flex items-center gap-2 text-white font-bold px-5 py-1.5 rounded-full text-sm gradient-magenta glow-btn hover:opacity-90 transition-all disabled:opacity-30">
                 <Send size={14} />
-                Publicar
+                {publishing ? 'Publicando...' : 'Publicar'}
               </button>
             </div>
           ) : (
-            /* Tipos de post — visible cuando está colapsado */
             <div className="flex items-center gap-1">
-              {POST_TYPES.map(({ id, icon: Icon, label, color, bg }) => (
+              {POST_TYPES.map(({ id, emoji, label, color, bg }) => (
                 <button key={id} onClick={() => openModal(id)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all hover:bg-white/8"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all hover:opacity-80"
                   style={{ background: bg, color }}>
-                  <Icon size={12} />
+                  <span>{emoji}</span>
                   <span className="hidden sm:inline">{label}</span>
                 </button>
               ))}
@@ -380,9 +488,7 @@ export default function CreatePost() {
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════
-          MODAL COMPLETO (tipos con campos extra)
-      ════════════════════════════════════════════ */}
+      {/* ════ MODAL COMPLETO ════ */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)' }}
@@ -402,13 +508,10 @@ export default function CreatePost() {
               )}
               <div className="flex-1">
                 <h3 className="text-white font-bold text-base">
-                  {step === 'type' ? 'Crear publicación' : `Nueva publicación · ${modalType?.label}`}
+                  {step === 'type' ? 'Crear publicación' : `${modalType?.emoji} ${modalType?.label}`}
                 </h3>
                 {step === 'form' && modalType && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className="w-2 h-2 rounded-full" style={{ background: modalType.color }} />
-                    <span className="text-xs" style={{ color: '#7A6890' }}>{modalType.description}</span>
-                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: '#7A6890' }}>{modalType.desc}</p>
                 )}
               </div>
               <button onClick={closeModal}
@@ -419,23 +522,21 @@ export default function CreatePost() {
 
             {/* Body */}
             <div className="overflow-y-auto flex-1 p-5">
-
-              {/* Paso 1 — elegir tipo */}
               {step === 'type' && (
                 <div className="flex flex-col gap-2">
-                  {POST_TYPES.map(({ id, icon: Icon, label, description, color, bg, border }) => (
+                  {POST_TYPES.map(({ id, emoji, label, desc, color, bg, border }) => (
                     <button key={id} onClick={() => { setSelectedType(id); setStep('form') }}
                       className="flex items-center gap-4 p-4 rounded-xl text-left transition-all"
                       style={{ background: bg, border: '1px solid transparent' }}
                       onMouseOver={e => (e.currentTarget.style.border = `1px solid ${border}`)}
                       onMouseOut={e => (e.currentTarget.style.border = '1px solid transparent')}>
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 text-2xl"
                         style={{ background: `${color}22`, border: `1px solid ${color}40` }}>
-                        <Icon size={20} style={{ color }} />
+                        {emoji}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm">{label}</p>
-                        <p className="text-xs mt-0.5" style={{ color: '#7A6890' }}>{description}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#7A6890' }}>{desc}</p>
                       </div>
                       <ChevronRight size={16} style={{ color: '#7A6890' }} />
                     </button>
@@ -443,13 +544,21 @@ export default function CreatePost() {
                 </div>
               )}
 
-              {/* Paso 2 — composer con campos */}
               {step === 'form' && modalType && (
                 <div className="flex flex-col gap-4">
+                  {/* Author */}
                   <div className="flex gap-3 items-center">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white text-sm font-bold gradient-magenta">TU</div>
+                    {currentUser?.avatar_url ? (
+                      <img src={currentUser.avatar_url} alt={currentUser.name}
+                        className="w-10 h-10 rounded-full object-cover shrink-0"
+                        style={{ border: '2px solid rgba(123,47,255,0.4)' }} />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white text-sm font-bold gradient-magenta">
+                        {currentUser?.name?.[0]?.toUpperCase() ?? '?'}
+                      </div>
+                    )}
                     <div>
-                      <p className="text-white text-sm font-semibold">Tu nombre</p>
+                      <p className="text-white text-sm font-semibold">{currentUser?.name ?? 'Tú'}</p>
                       <p className="text-xs" style={{ color: '#7A6890' }}>Publicando como tú</p>
                     </div>
                   </div>
@@ -458,13 +567,12 @@ export default function CreatePost() {
                   <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(123,47,255,0.2)' }}>
                     <textarea value={content} onChange={e => handleModalTextChange(e.target.value.slice(0, CHAR_LIMIT))}
                       placeholder={
-                        selectedType === 'work'    ? 'Describe lo que trabajaste, las herramientas que usaste...' :
-                        selectedType === 'service' ? 'Describe tu servicio, qué incluye, por qué contratar contigo...' :
-                        selectedType === 'product' ? 'Describe tu producto, formato, compatibilidad...' :
-                                                     'Describe el curso, a quién va dirigido, qué van a aprender...'
+                        selectedType === 'lanzamiento' ? 'Describe lo que estás lanzando...' :
+                        selectedType === 'logro'       ? '¿Qué conseguiste? Contale a la comunidad...' :
+                        selectedType === 'video'       ? 'Describí el video...' :
+                                                          '¿A quién estás buscando?'
                       }
                       rows={4} className="w-full bg-transparent text-white placeholder-[#7A6890] resize-none focus:outline-none text-sm leading-relaxed" />
-
                     {media.type && (
                       <MediaPreview media={media} onRemove={() => {
                         if (media.autoDetected) setModalDismissed(media.url)
@@ -485,54 +593,22 @@ export default function CreatePost() {
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#7A6890' }}>Adjuntar</p>
                     <div className="flex gap-2 flex-wrap">
-                      <MediaToolBtn icon={Music}     label="Audio"              color="#FF1A8C" active={media.type === 'audio'}   disabled={!!media.type && media.type !== 'audio'}   onClick={() => audioRef.current?.click()} />
-                      <MediaToolBtn icon={ImageIcon}  label="Imagen"             color="#8B3FFF" active={media.type === 'image'}   disabled={!!media.type && media.type !== 'image'}   onClick={() => imageRef.current?.click()} />
-                      <MediaToolBtn icon={Video}      label="YouTube / Spotify"  color="#06b6d4" active={mediaTab === 'link' || media.type === 'youtube' || media.type === 'spotify' || media.type === 'link'}
-                        disabled={!!media.type && media.type !== 'youtube' && media.type !== 'spotify' && media.type !== 'link'}
+                      <MediaToolBtn icon={Music}     label="Audio"             color="#FF1A8C" active={media.type === 'audio'}   disabled={!!media.type && media.type !== 'audio'}   onClick={() => audioRef.current?.click()} />
+                      <MediaToolBtn icon={ImageIcon}  label="Imagen"            color="#8B3FFF" active={media.type === 'image'}   disabled={!!media.type && media.type !== 'image'}   onClick={() => imageRef.current?.click()} />
+                      <MediaToolBtn icon={Video}      label="YouTube / Spotify" color="#06b6d4"
+                        active={mediaTab === 'link' || ['youtube','spotify','link'].includes(media.type ?? '')}
+                        disabled={!!media.type && !['youtube','spotify','link'].includes(media.type ?? '')}
                         onClick={() => setMediaTab(p => p === 'link' ? null : 'link')} />
                     </div>
                     <input ref={audioRef} type="file" accept="audio/*" className="hidden" onChange={handleModalAudio} />
                     <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={handleModalImage} />
                   </div>
 
-                  {/* Campos específicos por tipo */}
-                  {selectedType === 'service' && (
-                    <div className="flex flex-col gap-3 pt-1" style={{ borderTop: '1px solid rgba(123,47,255,0.12)' }}>
-                      <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#7A6890' }}>Detalles del servicio</p>
-                      <SmallField icon={Tag} placeholder="Título del servicio" value={svcTitle} onChange={setSvcTitle} />
-                      <div className="flex flex-wrap gap-1.5">
-                        {SERVICE_CATEGORIES.map(cat => (
-                          <button key={cat} onClick={() => setSvcCat(cat)}
-                            className="text-xs px-3 py-1 rounded-full font-medium transition-all"
-                            style={svcCat === cat
-                              ? { background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)', color: '#fff' }
-                              : { background: 'rgba(255,255,255,0.05)', color: '#C0A8D8', border: '1px solid rgba(123,47,255,0.2)' }}>
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex gap-3">
-                        <SmallField icon={DollarSign} placeholder="Precio (ej: €60)" value={svcPrice} onChange={setSvcPrice} />
-                        <SmallField icon={Clock} placeholder="Entrega (ej: 3 días)" value={svcDays} onChange={setSvcDays} />
-                      </div>
-                    </div>
-                  )}
-                  {selectedType === 'product' && (
-                    <div className="flex flex-col gap-3 pt-1" style={{ borderTop: '1px solid rgba(123,47,255,0.12)' }}>
-                      <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#7A6890' }}>Detalles del producto</p>
-                      <SmallField icon={Tag} placeholder="Nombre del producto" value={prdTitle} onChange={setPrdTitle} />
-                      <SmallField icon={DollarSign} placeholder="Precio" value={prdPrice} onChange={setPrdPrice} />
-                    </div>
-                  )}
-                  {selectedType === 'course' && (
-                    <div className="flex flex-col gap-3 pt-1" style={{ borderTop: '1px solid rgba(123,47,255,0.12)' }}>
-                      <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#7A6890' }}>Detalles del curso</p>
-                      <SmallField icon={Tag} placeholder="Título del curso" value={crsTitle} onChange={setCrsTitle} />
-                      <div className="flex gap-3">
-                        <SmallField icon={Clock} placeholder="Duración" value={crsDur} onChange={setCrsDur} />
-                        <SmallField icon={DollarSign} placeholder="Precio" value={crsPrx} onChange={setCrsPrx} />
-                      </div>
-                    </div>
+                  {modalError && (
+                    <p className="text-xs px-3 py-2 rounded-lg font-medium"
+                      style={{ background: 'rgba(255,50,50,0.1)', color: '#ff6b6b', border: '1px solid rgba(255,50,50,0.25)' }}>
+                      {modalError}
+                    </p>
                   )}
                 </div>
               )}
@@ -542,19 +618,14 @@ export default function CreatePost() {
             {step === 'form' && (
               <div className="px-5 py-4 flex items-center justify-between shrink-0"
                 style={{ borderTop: '1px solid rgba(123,47,255,0.15)' }}>
-                <div className="flex items-center gap-2">
-                  {media.type && (
-                    <span className="text-xs px-2.5 py-1 rounded-full font-medium"
-                      style={{ background: 'rgba(139,63,255,0.15)', color: '#A855F7', border: '1px solid rgba(139,63,255,0.3)' }}>
-                      {media.type === 'youtube' ? '▶ YouTube' : media.type === 'spotify' ? '🎵 Spotify' : media.type === 'audio' ? '🎙 Audio' : media.type === 'image' ? '🖼 Imagen' : '🔗 Enlace'}
-                    </span>
-                  )}
-                  <p className="text-xs" style={{ color: '#7A6890' }}>{media.type ? 'adjunto' : 'sin adjunto'}</p>
-                </div>
-                <button disabled={!content.trim()} onClick={closeModal}
+                <button onClick={closeModal} className="text-sm font-medium px-4 py-2 rounded-full"
+                  style={{ color: '#7A6890' }}>
+                  Cancelar
+                </button>
+                <button disabled={!content.trim() || modalPublishing} onClick={handleModalPublish}
                   className="flex items-center gap-2 text-white font-bold px-6 py-2.5 rounded-full text-sm gradient-magenta glow-btn hover:opacity-90 transition-all disabled:opacity-30">
                   <Send size={14} />
-                  Publicar
+                  {modalPublishing ? 'Publicando...' : 'Publicar'}
                 </button>
               </div>
             )}
@@ -590,18 +661,5 @@ function MediaToolBtn({ icon: Icon, label, color, active, disabled, onClick }: {
       <Icon size={14} />
       {label}
     </button>
-  )
-}
-
-function SmallField({ icon: Icon, placeholder, value, onChange }: {
-  icon: React.ElementType; placeholder: string; value: string; onChange: (v: string) => void
-}) {
-  return (
-    <div className="flex items-center gap-2.5 flex-1 px-3 py-2.5 rounded-xl"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(123,47,255,0.2)' }}>
-      <Icon size={14} style={{ color: '#7A6890' }} />
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="flex-1 bg-transparent text-white placeholder-[#7A6890] text-sm focus:outline-none min-w-0" />
-    </div>
   )
 }

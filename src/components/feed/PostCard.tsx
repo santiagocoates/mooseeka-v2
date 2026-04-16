@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, ExternalLink } from 'lucide-react'
 
 const WAVEFORM = [45,70,35,85,55,90,40,75,60,95,30,65,80,50,70,40,88,55,72,38,92,48,67,82,44,76,58,91,36,69,84,52,78,42,88,61,74,46,83,57]
@@ -85,10 +86,12 @@ export interface PostData {
     avatar?: string
     initials: string
     avatarGradient?: string
+    username?: string
   }
   time: string
   content: string
   type: 'work' | 'service' | 'achievement' | 'regular'
+  image?: string
   audio?: { title: string; duration: string }
   service?: { title: string; price: string; category: string; rating: number }
   embed?: {
@@ -129,7 +132,20 @@ export default function PostCard({ post }: { post: PostData }) {
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          {post.author.avatar ? (
+          {post.author.username ? (
+            <Link href={`/${post.author.username}`} className="shrink-0">
+              {post.author.avatar ? (
+                <img src={post.author.avatar} alt={post.author.name}
+                  className="w-10 h-10 rounded-full object-cover"
+                  style={{ border: '2px solid rgba(123,47,255,0.4)' }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm"
+                  style={{ background: 'linear-gradient(135deg, #8B3FFF, #FF1A8C)' }}>
+                  {post.author.initials}
+                </div>
+              )}
+            </Link>
+          ) : post.author.avatar ? (
             <img src={post.author.avatar} alt={post.author.name}
               className="w-10 h-10 rounded-full object-cover shrink-0"
               style={{ border: '2px solid rgba(123,47,255,0.4)' }} />
@@ -141,7 +157,13 @@ export default function PostCard({ post }: { post: PostData }) {
           )}
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-white font-semibold text-sm">{post.author.name}</span>
+              {post.author.username ? (
+                <Link href={`/${post.author.username}`} className="text-white font-semibold text-sm hover:underline">
+                  {post.author.name}
+                </Link>
+              ) : (
+                <span className="text-white font-semibold text-sm">{post.author.name}</span>
+              )}
               {post.type !== 'regular' && (
                 <span className="text-xs font-medium px-2 py-0.5 rounded-full"
                   style={{ background: `${typeColors[post.type]}20`, color: typeColors[post.type] }}>
@@ -163,6 +185,13 @@ export default function PostCard({ post }: { post: PostData }) {
 
       {/* Content */}
       <p className="text-sm leading-relaxed" style={{ color: '#C0A8D8' }}>{post.content}</p>
+
+      {/* Image */}
+      {post.image && (
+        <div className="mt-3 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(123,47,255,0.2)' }}>
+          <img src={post.image} alt="" className="w-full object-cover" style={{ maxHeight: 320 }} />
+        </div>
+      )}
 
       {/* Embedded audio */}
       {post.audio && <AudioPlayer title={post.audio.title} duration={post.audio.duration} />}

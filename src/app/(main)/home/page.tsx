@@ -1,103 +1,201 @@
 'use client'
 
+import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import CreatePost from '@/components/feed/CreatePost'
 import PostCard, { PostData } from '@/components/feed/PostCard'
-import RightSidebar from '@/components/feed/RightSidebar'
 
-const TRENDING_ARTISTS = [
-  { name: 'DistroDub', genre: 'Jazz · 8 seguidores', avatar: '/users/user2.jpg' },
-  { name: 'Three Dogs Y.', genre: 'Alternative · 1 seguidor', avatar: '/users/user1.jpg' },
-  { name: 'Adrede', genre: 'Alternative · 3 seguidores', avatar: '/users/artistas.jpg' },
-]
+interface TrendingProfile {
+  id: string
+  name: string
+  username: string
+  avatar_url: string | null
+  roles: string[] | null
+  follower_count: number
+}
 
-const MOCK_POSTS: PostData[] = [
-  {
-    id: '1',
-    author: { name: 'Elena Ríos', role: 'Productora Musical', avatar: '/users/productores.jpg', initials: 'ER' },
-    time: '2h',
-    type: 'work',
-    content: 'Acabo de masterizar este track para @DJSlime 🎧 Sonido analógico puro para un beat demoledor.',
-    audio: { title: 'Deep Oceans (Master)', duration: '3:45' },
-    likes: 24,
-    comments: 6,
-  },
-  {
-    id: '2',
-    author: { name: 'Acid Beat', role: 'Music Producer', avatar: '/users/user2.jpg', initials: 'AB' },
-    time: '5h',
-    type: 'service',
-    content: 'Nuevo servicio disponible en el market 🎹 Producción de trap con sonido profesional. ¡Primeros 5 clientes con 20% OFF!',
-    service: { title: 'Producción de Trap', price: '€60/track', category: 'Producción', rating: 4.9 },
-    likes: 41,
-    comments: 12,
-    liked: true,
-  },
-  {
-    id: '3',
-    author: { name: 'Marta Sound', role: 'Mastering Engineer', avatar: '/users/ingeniera.jpg', initials: 'MS' },
-    time: '1d',
-    type: 'achievement',
-    content: '🔥 Acabo de llegar a las 100 reseñas en Mooseeka con un promedio de 5 estrellas. Gracias a todos los clientes increíbles que han confiado en mi trabajo. La industria latina está creciendo fuerte 💜',
-    likes: 87,
-    comments: 23,
-  },
-  {
-    id: '4',
-    author: { name: 'DJ Slime', role: 'DJ · Productor', avatar: '/users/user1.jpg', initials: 'DS' },
-    time: '3h',
-    type: 'work',
-    content: 'Nuevo track ya disponible 🔥 Producido con @AcidBeat https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    embed: {
-      type: 'youtube',
-      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      youtubeId: 'dQw4w9WgXcQ',
+function getYouTubeId(url: string) {
+  const m = url?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+function getSpotifyEmbed(url: string) {
+  const m = url?.match(/open\.spotify\.com\/(track|album|playlist|episode)\/([A-Za-z0-9]+)/)
+  return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}` : null
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins  = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days  = Math.floor(diff / 86400000)
+  if (mins  < 1)  return 'ahora'
+  if (mins  < 60) return `${mins}m`
+  if (hours < 24) return `${hours}h`
+  if (days  < 7)  return `${days}d`
+  return new Date(dateStr).toLocaleDateString('es', { day: 'numeric', month: 'short' })
+}
+
+function mapDbPostToPostData(row: Record<string, unknown>): PostData {
+  const profile = row.profile as Record<string, unknown>
+  const roles   = (profile?.roles as string[] | null) ?? []
+  const roleStr = roles.slice(0, 2).join(' · ') || 'Mooseeka'
+  const name    = (profile?.name as string) ?? 'Usuario'
+
+  let embed: PostData['embed'] | undefined
+  const link = row.link as string | null
+  if (link) {
+    const ytId = getYouTubeId(link)
+    if (ytId) {
+      embed = { type: 'youtube', url: link, youtubeId: ytId }
+    } else {
+      const spEmbed = getSpotifyEmbed(link)
+      if (spEmbed) {
+        embed = { type: 'spotify', url: link, spotifyEmbed: spEmbed }
+      } else if (link.startsWith('http')) {
+        embed = { type: 'link', url: link }
+      }
+    }
+  }
+
+  const type = row.type as string
+  const postDataType: PostData['type'] =
+    type === 'logro'    ? 'achievement' :
+    type === 'busqueda' ? 'regular'     : 'work'
+
+  return {
+    id:      row.id as string,
+    author: {
+      name,
+      role:   roleStr,
+      avatar: (profile?.avatar_url as string) || undefined,
+      initials: name[0]?.toUpperCase() ?? '?',
+      username: profile?.username as string,
     },
-    likes: 53,
-    comments: 9,
-  },
-]
+    time:    timeAgo(row.created_at as string),
+    type:    postDataType,
+    content: row.content as string,
+    image:   (row.image_url as string) || undefined,
+    embed,
+    likes:    0,
+    comments: 0,
+  }
+}
 
 export default function HomePage() {
+  const [posts,    setPosts]    = useState<PostData[]>([])
+  const [trending, setTrending] = useState<TrendingProfile[]>([])
+  const [loading,  setLoading]  = useState(true)
+
+  const loadFeed = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('posts')
+      .select('*, profile:profiles(id, name, username, avatar_url, roles)')
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    if (data) setPosts(data.map(mapDbPostToPostData))
+    setLoading(false)
+  }, [])
+
+  const loadTrending = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, username, avatar_url, roles')
+      .eq('onboarding_completed', true)
+      .order('created_at', { ascending: false })
+      .limit(4)
+    if (data) setTrending(data.map(p => ({ ...p, follower_count: 0 })))
+  }, [])
+
+  useEffect(() => {
+    loadFeed()
+    loadTrending()
+  }, [loadFeed, loadTrending])
+
+  function handleNewPost(post: PostData) {
+    setPosts(prev => [post, ...prev])
+  }
+
   return (
     <div className="flex min-h-screen">
       <div className="flex-1 max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
-        <CreatePost />
+        <CreatePost onPost={handleNewPost} />
 
-        {/* Trending Artists */}
-        <div className="rounded-2xl p-4 card-shadow" style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-lg">🔥</span>
-            <h2 className="text-white font-bold">Tendencias Artistas</h2>
+        {/* Trending — solo si hay perfiles */}
+        {trending.length > 0 && (
+          <div className="rounded-2xl p-4 card-shadow"
+            style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">🔥</span>
+              <h2 className="text-white font-bold">Perfiles recientes</h2>
+            </div>
+            <div className="flex flex-col gap-3">
+              {trending.map(profile => (
+                <Link key={profile.id} href={`/${profile.username}`}
+                  className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} alt={profile.name}
+                      className="w-9 h-9 rounded-full object-cover shrink-0"
+                      style={{ border: '2px solid rgba(123,47,255,0.4)' }} />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-white font-bold text-sm"
+                      style={{ background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)', border: '2px solid rgba(123,47,255,0.4)' }}>
+                      {profile.name[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-semibold truncate">{profile.name}</p>
+                    <p className="text-xs truncate" style={{ color: '#7A6890' }}>
+                      {profile.roles?.slice(0, 2).join(' · ') || 'Mooseeka'}
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold px-3 py-1.5 rounded-full shrink-0 transition-all"
+                    style={{ border: '1px solid rgba(255,26,140,0.5)', color: '#FF1A8C' }}>
+                    Ver perfil
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-col gap-3">
-            {TRENDING_ARTISTS.map(artist => (
-              <div key={artist.name} className="flex items-center gap-3">
-                <img src={artist.avatar} alt={artist.name}
-                  className="w-9 h-9 rounded-full object-cover shrink-0"
-                  style={{ border: '2px solid rgba(123,47,255,0.4)' }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold">{artist.name}</p>
-                  <p className="text-xs" style={{ color: '#7A6890' }}>{artist.genre}</p>
+        )}
+
+        {/* Feed */}
+        {loading && (
+          <div className="flex flex-col gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="rounded-2xl p-5 animate-pulse"
+                style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
+                <div className="flex gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full" style={{ background: 'rgba(123,47,255,0.2)' }} />
+                  <div className="flex-1">
+                    <div className="h-3 w-32 rounded mb-2" style={{ background: 'rgba(123,47,255,0.15)' }} />
+                    <div className="h-2 w-24 rounded" style={{ background: 'rgba(123,47,255,0.1)' }} />
+                  </div>
                 </div>
-                <button className="text-xs font-bold px-4 py-1.5 rounded-full shrink-0 transition-all hover:bg-[#FF1A8C] hover:text-white"
-                  style={{ border: '1px solid rgba(255,26,140,0.5)', color: '#FF1A8C' }}>
-                  Seguir
-                </button>
+                <div className="h-3 w-full rounded mb-2" style={{ background: 'rgba(123,47,255,0.1)' }} />
+                <div className="h-3 w-3/4 rounded" style={{ background: 'rgba(123,47,255,0.07)' }} />
               </div>
             ))}
           </div>
-          <button className="text-sm mt-3 transition-colors hover:opacity-80" style={{ color: '#A855F7' }}>
-            Ver todas las tendencias →
-          </button>
-        </div>
+        )}
 
-        {MOCK_POSTS.map(post => (
+        {!loading && posts.length === 0 && (
+          <div className="rounded-2xl p-10 text-center"
+            style={{ background: 'rgba(25,0,50,0.4)', border: '1px dashed rgba(123,47,255,0.25)' }}>
+            <p className="text-3xl mb-3">🎵</p>
+            <p className="text-white font-semibold text-sm mb-1">El feed está vacío</p>
+            <p className="text-xs" style={{ color: '#7A6890' }}>
+              Sé el primero en publicar algo.
+            </p>
+          </div>
+        )}
+
+        {!loading && posts.map(post => (
           <PostCard key={post.id} post={post} />
         ))}
-      </div>
-
-      <div className="hidden xl:block">
-        <RightSidebar />
       </div>
     </div>
   )
