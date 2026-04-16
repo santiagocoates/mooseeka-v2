@@ -6,9 +6,16 @@ import { SOCIAL_CONFIG } from './SocialIcons'
 import { createClient } from '@/lib/supabase/client'
 
 const ROLES = [
-  'Artista', 'Productor', 'Ingeniero de Mezcla', 'Masterizador',
-  'Compositor', 'DJ', 'Manager', 'Marketer', 'Diseñador',
-  'Abogado Musical', 'Educador', 'Otro',
+  // Artistas
+  'Artista', 'Banda', 'DJ', 'Compositor',
+  // Instrumentistas
+  'Guitarrista', 'Bajista', 'Baterista', 'Pianista / Teclado',
+  'Trompetista', 'Saxofonista', 'Violinista', 'Percusionista', 'Músico de Sesión',
+  // Producción
+  'Productor', 'Arreglista', 'Ingeniero de Mezcla', 'Masterizador',
+  // Industria
+  'Manager', 'Booking Agent', 'Promotor', 'Publicista / PR',
+  'Marketer', 'Diseñador', 'Foto / Video', 'Abogado Musical', 'Educador',
 ]
 
 interface Profile {
@@ -54,7 +61,7 @@ export default function EditProfileModal({ open, onClose, profile, onSave }: Edi
 
   function toggleRole(role: string) {
     setSelectedRoles(prev =>
-      prev.includes(role) ? prev.filter(r => r !== role) : prev.length < 4 ? [...prev, role] : prev
+      prev.includes(role) ? prev.filter(r => r !== role) : prev.length < 5 ? [...prev, role] : prev
     )
   }
 
@@ -230,7 +237,7 @@ export default function EditProfileModal({ open, onClose, profile, onSave }: Edi
             <div className="flex flex-col gap-4">
               <div>
                 <p className="text-white font-semibold text-sm mb-1">¿Qué haces en la industria?</p>
-                <p className="text-xs" style={{ color: '#7A6890' }}>Elige hasta 4 roles. Aparecen en tu perfil público.</p>
+                <p className="text-xs" style={{ color: '#7A6890' }}>Elige hasta 5 roles. Aparecen en tu perfil público.</p>
               </div>
               {selectedRoles.length > 0 && (
                 <div>

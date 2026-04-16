@@ -7,21 +7,39 @@ import StepProgress from '@/components/onboarding/StepProgress'
 import { useOnboarding } from '../context'
 
 const ROLES = [
-  { id: 'artista',    label: 'Artista',             emoji: '🎤', desc: 'Cantante, músico, MC' },
-  { id: 'productor',  label: 'Productor',            emoji: '🎛️', desc: 'Beat maker, productor musical' },
-  { id: 'mixing',     label: 'Ingeniero de mezcla',  emoji: '🎚️', desc: 'Mixing engineer' },
-  { id: 'mastering',  label: 'Masterizador',         emoji: '📀', desc: 'Mastering engineer' },
-  { id: 'compositor', label: 'Compositor',           emoji: '🎼', desc: 'Escritor de canciones' },
-  { id: 'dj',         label: 'DJ',                   emoji: '🎧', desc: 'DJ, turntablist' },
-  { id: 'manager',    label: 'Manager',              emoji: '📋', desc: 'Artist manager, A&R' },
-  { id: 'marketer',   label: 'Marketer',             emoji: '📣', desc: 'Marketing musical' },
-  { id: 'disenador',  label: 'Diseñador',            emoji: '🎨', desc: 'Arte, visuales, branding' },
-  { id: 'abogado',    label: 'Abogado Musical',      emoji: '⚖️', desc: 'Derechos, contratos' },
-  { id: 'educador',   label: 'Educador',             emoji: '📚', desc: 'Maestro, coach musical' },
-  { id: 'fotovideo',  label: 'Foto / Video',         emoji: '🎬', desc: 'Videoclips, fotografía' },
+  // Artistas / Performers
+  { id: 'artista',     label: 'Artista',             emoji: '🎤', desc: 'Cantante, solista, MC' },
+  { id: 'banda',       label: 'Banda',               emoji: '🎸', desc: 'Grupo musical' },
+  { id: 'dj',          label: 'DJ',                  emoji: '🎧', desc: 'DJ, turntablist' },
+  { id: 'compositor',  label: 'Compositor',          emoji: '🎼', desc: 'Escritor de canciones' },
+  // Instrumentistas
+  { id: 'guitarrista', label: 'Guitarrista',         emoji: '🎸', desc: 'Guitarra eléctrica / acústica' },
+  { id: 'bajista',     label: 'Bajista',             emoji: '🎵', desc: 'Bajo eléctrico / acústico' },
+  { id: 'baterista',   label: 'Baterista',           emoji: '🥁', desc: 'Batería, percusión' },
+  { id: 'pianista',    label: 'Pianista / Teclado',  emoji: '🎹', desc: 'Piano, sintetizadores' },
+  { id: 'trompetista', label: 'Trompetista',         emoji: '🎺', desc: 'Trompeta, metales' },
+  { id: 'saxofonista', label: 'Saxofonista',         emoji: '🎷', desc: 'Saxofón, vientos' },
+  { id: 'violinista',  label: 'Violinista',          emoji: '🎻', desc: 'Violín, cuerdas' },
+  { id: 'percusionista', label: 'Percusionista',     emoji: '🪘', desc: 'Percusión latina, batería' },
+  { id: 'sesion',      label: 'Músico de Sesión',    emoji: '🎙️', desc: 'Disponible para grabaciones' },
+  // Producción
+  { id: 'productor',   label: 'Productor',           emoji: '🎛️', desc: 'Beat maker, productor musical' },
+  { id: 'arreglista',  label: 'Arreglista',          emoji: '📝', desc: 'Arreglos y orquestación' },
+  { id: 'mixing',      label: 'Ingeniero de mezcla', emoji: '🎚️', desc: 'Mixing engineer' },
+  { id: 'mastering',   label: 'Masterizador',        emoji: '📀', desc: 'Mastering engineer' },
+  // Industria
+  { id: 'manager',     label: 'Manager',             emoji: '📋', desc: 'Artist manager, A&R' },
+  { id: 'booking',     label: 'Booking Agent',       emoji: '📅', desc: 'Giras, fechas, shows' },
+  { id: 'promotor',    label: 'Promotor',            emoji: '🎯', desc: 'Eventos, shows, festivales' },
+  { id: 'publicista',  label: 'Publicista / PR',     emoji: '📣', desc: 'Prensa, comunicación' },
+  { id: 'marketer',    label: 'Marketer',            emoji: '📊', desc: 'Marketing digital musical' },
+  { id: 'disenador',   label: 'Diseñador',           emoji: '🎨', desc: 'Arte, visuales, branding' },
+  { id: 'fotovideo',   label: 'Foto / Video',        emoji: '🎬', desc: 'Videoclips, fotografía' },
+  { id: 'abogado',     label: 'Abogado Musical',     emoji: '⚖️', desc: 'Derechos, contratos' },
+  { id: 'educador',    label: 'Educador',            emoji: '📚', desc: 'Maestro, coach musical' },
 ]
 
-const MAX_ROLES = 4
+const MAX_ROLES = 5
 
 export default function OnboardingRoles() {
   const router = useRouter()
