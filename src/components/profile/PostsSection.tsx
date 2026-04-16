@@ -71,6 +71,8 @@ export default function PostsSection({ profileId, isOwner }: PostsSectionProps) 
   function openEdit(post: Post) { setEditing(post);  setModalOpen(true) }
 
   if (loading) return null
+  // Non-owners see nothing if there are no posts
+  if (!isOwner && posts.length === 0) return null
 
   return (
     <>
@@ -86,8 +88,8 @@ export default function PostsSection({ profileId, isOwner }: PostsSectionProps) 
           )}
         </div>
 
-        {/* Empty state */}
-        {posts.length === 0 && (
+        {/* Empty state — only for owner */}
+        {posts.length === 0 && isOwner && (
           <div className="rounded-2xl p-8 text-center"
             style={{ background: 'rgba(25,0,50,0.4)', border: '1px dashed rgba(123,47,255,0.25)' }}>
             <p className="text-3xl mb-3">✨</p>

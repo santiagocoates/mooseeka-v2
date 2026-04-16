@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Link2, ImagePlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,10 +15,10 @@ export interface Post {
 }
 
 const POST_TYPES = [
-  { id: 'logro',      label: 'Logro',       emoji: '🏆', desc: 'Un hito, reconocimiento o meta alcanzada' },
-  { id: 'lanzamiento',label: 'Lanzamiento', emoji: '🚀', desc: 'Nuevo single, EP, álbum o beat' },
-  { id: 'video',      label: 'Video',       emoji: '🎬', desc: 'Videoclip, live session o behind the scenes' },
-  { id: 'busqueda',   label: 'Búsqueda',    emoji: '🔍', desc: 'Buscás músico, productor o colaborador' },
+  { id: 'logro',       label: 'Logro',       emoji: '🏆', desc: 'Un hito, reconocimiento o meta alcanzada' },
+  { id: 'lanzamiento', label: 'Lanzamiento', emoji: '🚀', desc: 'Nuevo single, EP, álbum o beat' },
+  { id: 'video',       label: 'Video',       emoji: '🎬', desc: 'Videoclip, live session o behind the scenes' },
+  { id: 'busqueda',    label: 'Búsqueda',    emoji: '🔍', desc: 'Buscas músico, productor o colaborador' },
 ]
 
 interface CreatePostModalProps {
@@ -30,13 +30,27 @@ interface CreatePostModalProps {
 }
 
 export default function CreatePostModal({ open, profileId, onClose, onSave, initial }: CreatePostModalProps) {
-  const [type,        setType]        = useState(initial?.type    ?? 'logro')
-  const [content,     setContent]     = useState(initial?.content ?? '')
-  const [link,        setLink]        = useState(initial?.link    ?? '')
-  const [imagePreview, setImagePreview] = useState<string | null>(initial?.image_url ?? null)
-  const [imageFile,   setImageFile]   = useState<File | null>(null)
-  const [saving,      setSaving]      = useState(false)
+  const [type,         setType]         = useState('logro')
+  const [content,      setContent]      = useState('')
+  const [link,         setLink]         = useState('')
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageFile,    setImageFile]    = useState<File | null>(null)
+  const [saving,       setSaving]       = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Reset state every time the modal opens
+  useEffect(() => {
+    if (open) {
+      setType(initial?.type    ?? 'logro')
+      setContent(initial?.content ?? '')
+      setLink(initial?.link    ?? '')
+      setImagePreview(initial?.image_url ?? null)
+      setImageFile(null)
+      setError(null)
+      setSaving(false)
+    }
+  }, [open, initial])
 
   const CONTENT_LIMIT = 400
   const canSave = content.trim().length > 0
@@ -50,6 +64,7 @@ export default function CreatePostModal({ open, profileId, onClose, onSave, init
   async function handleSave() {
     if (!canSave) return
     setSaving(true)
+    setError(null)
     try {
       const supabase = createClient()
       let image_url = initial?.image_url ?? null
@@ -57,8 +72,10 @@ export default function CreatePostModal({ open, profileId, onClose, onSave, init
       if (imageFile) {
         const ext  = imageFile.name.split('.').pop()
         const path = `${profileId}/${Date.now()}.${ext}`
-        const { error } = await supabase.storage.from('posts').upload(path, imageFile, { upsert: true })
-        if (!error) {
+        const { error: uploadError } = await supabase.storage
+          .from('posts')
+          .upload(path, imageFile, { upsert: true })
+        if (!uploadError) {
           const { data } = supabase.storage.from('posts').getPublicUrl(path)
           image_url = data.publicUrl
         }
@@ -67,20 +84,32 @@ export default function CreatePostModal({ open, profileId, onClose, onSave, init
       const row = {
         profile_id: profileId,
         type,
-        content: content.trim(),
-        link:     link.trim() || null,
+        content:    content.trim(),
+        link:       link.trim() || null,
         image_url,
       }
 
       if (initial) {
-        await supabase.from('posts').update(row).eq('id', initial.id)
+        const { error: updateError } = await supabase
+          .from('posts')
+          .update(row)
+          .eq('id', initial.id)
+        if (updateError) throw updateError
         onSave({ ...initial, type, content: content.trim(), link: link.trim(), image_url })
       } else {
-        const { data } = await supabase.from('posts').insert(row).select().single()
+        const { data, error: insertError } = await supabase
+          .from('posts')
+          .insert(row)
+          .select()
+          .single()
+        if (insertError) throw insertError
         if (data) onSave(data)
       }
 
       onClose()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? 'Error al publicar'
+      setError(msg)
     } finally {
       setSaving(false)
     }
@@ -109,6 +138,14 @@ export default function CreatePostModal({ open, profileId, onClose, onSave, init
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 p-5 flex flex-col gap-5">
+
+          {/* Error */}
+          {error && (
+            <div className="px-4 py-3 rounded-xl text-sm font-medium"
+              style={{ background: 'rgba(255,50,50,0.12)', border: '1px solid rgba(255,50,50,0.3)', color: '#ff6b6b' }}>
+              {error}
+            </div>
+          )}
 
           {/* Tipo */}
           <div>
@@ -141,8 +178,8 @@ export default function CreatePostModal({ open, profileId, onClose, onSave, init
               value={content}
               onChange={e => setContent(e.target.value.slice(0, CONTENT_LIMIT))}
               placeholder={
-                type === 'logro'       ? 'Contá tu logro, ¿qué conseguiste?' :
-                type === 'lanzamiento' ? '¿Qué estás lanzando? Contale a la comunidad...' :
+                type === 'logro'       ? '¿Qué conseguiste? Contale a la comunidad...' :
+                type === 'lanzamiento' ? '¿Qué estás lanzando? Comparte los detalles...' :
                 type === 'video'       ? 'Describí el video, dónde fue filmado, de qué trata...' :
                                          '¿A quién estás buscando? Describí el perfil ideal...'
               }
