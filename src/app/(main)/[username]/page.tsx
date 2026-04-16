@@ -9,6 +9,7 @@ import ShareModal from '@/components/shared/ShareModal'
 import { SocialLinks } from '@/components/profile/SocialIcons'
 import PortfolioSection from '@/components/profile/PortfolioSection'
 import ExperienceSection from '@/components/profile/ExperienceSection'
+import PostsSection from '@/components/profile/PostsSection'
 
 const BASE_URL = 'https://mooseeka.com'
 
@@ -223,6 +224,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left column */}
           <div className="flex-1 min-w-0">
+            {/* Posts / Activity feed */}
+            <PostsSection profileId={profile.id} isOwner={isOwner} />
+
             {/* Portfolio */}
             <PortfolioSection profileId={profile.id} isOwner={isOwner} />
 
