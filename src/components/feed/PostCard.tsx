@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, ExternalLink } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, Trash2, Link2, Check } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 /* ── Audio Player ─────────────────────────────────── */
 function AudioPlayer({ src, fileName }: { src: string; fileName?: string }) {
@@ -39,15 +40,12 @@ function AudioPlayer({ src, fileName }: { src: string; fileName?: string }) {
     const audio = audioRef.current
     if (!audio || !duration) return
     const rect = e.currentTarget.getBoundingClientRect()
-    const pct  = (e.clientX - rect.left) / rect.width
-    audio.currentTime = pct * duration
+    audio.currentTime = ((e.clientX - rect.left) / rect.width) * duration
   }
 
   function fmt(s: number) {
     if (!s || isNaN(s)) return '0:00'
-    const m = Math.floor(s / 60)
-    const sec = Math.floor(s % 60)
-    return `${m}:${sec.toString().padStart(2, '0')}`
+    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`
   }
 
   const BARS = [45,70,35,85,55,90,40,75,60,95,30,65,80,50,70,40,88,55,72,38,92,48,67,82,44,76,58,91,36,69,84,52,78,42,88,61,74,46,83,57]
@@ -58,9 +56,7 @@ function AudioPlayer({ src, fileName }: { src: string; fileName?: string }) {
       <div className="flex items-center gap-3">
         <button onClick={togglePlay}
           className="w-11 h-11 rounded-full gradient-magenta flex items-center justify-center shrink-0 hover:opacity-90 transition-all">
-          {playing
-            ? <Pause size={18} fill="white" className="text-white" />
-            : <Play  size={18} fill="white" className="text-white ml-0.5" />}
+          {playing ? <Pause size={18} fill="white" className="text-white" /> : <Play size={18} fill="white" className="text-white ml-0.5" />}
         </button>
         <div className="flex-1 min-w-0">
           {fileName && (
@@ -69,20 +65,15 @@ function AudioPlayer({ src, fileName }: { src: string; fileName?: string }) {
               {fileName.replace(/\.[^/.]+$/, '')}
             </p>
           )}
-          {/* Waveform */}
           <div className="flex items-end gap-0.5 h-7 cursor-pointer mb-1.5" onClick={seek}>
-            {BARS.map((h, i) => {
-              const filled = i < (progress / 100) * BARS.length
-              return (
-                <div key={i} className="flex-1 rounded-sm transition-colors"
-                  style={{ height: `${h}%`, background: filled ? '#A855F7' : 'rgba(255,255,255,0.12)' }} />
-              )
-            })}
+            {BARS.map((h, i) => (
+              <div key={i} className="flex-1 rounded-sm transition-colors"
+                style={{ height: `${h}%`, background: i < (progress / 100) * BARS.length ? '#A855F7' : 'rgba(255,255,255,0.12)' }} />
+            ))}
           </div>
-          {/* Progress bar + time */}
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1 rounded-full cursor-pointer overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }} onClick={seek}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'linear-gradient(to right, #8B3FFF, #FF1A8C)' }} />
+              <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'linear-gradient(to right, #8B3FFF, #FF1A8C)' }} />
             </div>
             <span className="text-xs shrink-0 tabular-nums" style={{ color: '#7A6890' }}>{fmt(current)} / {fmt(duration)}</span>
           </div>
@@ -137,17 +128,55 @@ function getDomain(url: string) {
 }
 
 /* ── PostCard ─────────────────────────────────────── */
-export default function PostCard({ post }: { post: PostData }) {
-  const [liked,     setLiked]     = useState(post.liked ?? false)
-  const [likeCount, setLikeCount] = useState(post.likes)
+interface PostCardProps {
+  post: PostData
+  currentUsername?: string
+  onDelete?: (id: string) => void
+}
+
+export default function PostCard({ post, currentUsername, onDelete }: PostCardProps) {
+  const [liked,       setLiked]       = useState(post.liked ?? false)
+  const [likeCount,   setLikeCount]   = useState(post.likes)
+  const [menuOpen,    setMenuOpen]    = useState(false)
+  const [deleting,    setDeleting]    = useState(false)
+  const [copied,      setCopied]      = useState(false)
+
+  const isOwner = !!currentUsername && currentUsername === post.author.username
+  const color   = TYPE_COLORS[post.type] ?? '#8b5cf6'
+  const label   = TYPE_LABELS[post.type] ?? 'Post'
 
   function toggleLike() {
     setLiked(prev => !prev)
     setLikeCount(prev => liked ? prev - 1 : prev + 1)
   }
 
-  const color = TYPE_COLORS[post.type] ?? '#8b5cf6'
-  const label = TYPE_LABELS[post.type] ?? 'Post'
+  async function handleDelete() {
+    if (!isOwner || deleting) return
+    setDeleting(true)
+    const supabase = createClient()
+    await supabase.from('posts').delete().eq('id', post.id)
+    onDelete?.(post.id)
+  }
+
+  async function handleShare() {
+    const url = `${window.location.origin}/home`
+    const text = `${post.author.name} en Mooseeka: "${post.content.slice(0, 80)}${post.content.length > 80 ? '...' : ''}"`
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Mooseeka', text, url }) } catch {}
+    } else {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = () => setMenuOpen(false)
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [menuOpen])
 
   return (
     <article className="rounded-2xl p-5 card-shadow" style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
@@ -183,29 +212,60 @@ export default function PostCard({ post }: { post: PostData }) {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               {post.author.username ? (
-                <Link href={`/${post.author.username}`} className="text-white font-semibold text-sm hover:underline">
+                <Link href={`/${post.author.username}`} className="text-white font-bold text-sm hover:underline">
                   {post.author.name}
                 </Link>
               ) : (
-                <span className="text-white font-semibold text-sm">{post.author.name}</span>
+                <span className="text-white font-bold text-sm">{post.author.name}</span>
               )}
-              {post.type !== 'regular' && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: `${color}20`, color }}>
-                  {label}
-                </span>
-              )}
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                style={{ background: `${color}20`, color }}>
+                {label}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {post.author.role && <span className="text-xs" style={{ color: '#7A6890' }}>{post.author.role}</span>}
+            {/* Roles + time */}
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              {post.author.role && (
+                <span className="text-xs font-medium" style={{ color: '#C0A8D8' }}>{post.author.role}</span>
+              )}
               {post.author.role && <span className="text-xs" style={{ color: '#7A6890' }}>·</span>}
               <span className="text-xs" style={{ color: '#7A6890' }}>{post.time}</span>
             </div>
           </div>
         </div>
-        <button className="hover:text-white transition-colors p-1 shrink-0" style={{ color: '#7A6890' }}>
-          <MoreHorizontal size={18} />
-        </button>
+
+        {/* ··· menu */}
+        <div className="relative shrink-0">
+          <button
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
+            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            style={{ color: '#7A6890' }}>
+            <MoreHorizontal size={18} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-8 z-20 rounded-xl overflow-hidden shadow-2xl min-w-[150px]"
+              style={{ background: '#1A0035', border: '1px solid rgba(123,47,255,0.3)' }}
+              onClick={e => e.stopPropagation()}>
+              {isOwner && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-medium transition-colors hover:bg-red-500/15 text-left"
+                  style={{ color: '#ff6b6b' }}>
+                  <Trash2 size={14} />
+                  {deleting ? 'Eliminando...' : 'Eliminar post'}
+                </button>
+              )}
+              <button
+                onClick={() => { handleShare(); setMenuOpen(false) }}
+                className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-medium transition-colors hover:bg-white/8 text-left"
+                style={{ color: '#C0A8D8' }}>
+                <Link2 size={14} />
+                Copiar enlace
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Text content */}
@@ -218,21 +278,17 @@ export default function PostCard({ post }: { post: PostData }) {
         </div>
       )}
 
-      {/* Audio player (unreleased music) */}
-      {post.audio_url && (
-        <AudioPlayer src={post.audio_url} fileName={post.audio_name} />
-      )}
+      {/* Audio player */}
+      {post.audio_url && <AudioPlayer src={post.audio_url} fileName={post.audio_name} />}
 
-      {/* YouTube embed — full iframe */}
+      {/* YouTube embed */}
       {post.embed?.type === 'youtube' && post.embed.youtubeId && (
         <div className="relative rounded-xl overflow-hidden mt-3" style={{ border: '1px solid rgba(123,47,255,0.25)', paddingTop: '56.25%' }}>
           <iframe
             src={`https://www.youtube.com/embed/${post.embed.youtubeId}?rel=0`}
             className="absolute inset-0 w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-            style={{ border: 'none' }}
+            allowFullScreen loading="lazy" style={{ border: 'none' }}
           />
         </div>
       )}
@@ -257,14 +313,13 @@ export default function PostCard({ post }: { post: PostData }) {
             <p className="text-xs font-semibold truncate" style={{ color: '#C0A8D8' }}>{getDomain(post.embed.url)}</p>
             <p className="text-xs truncate mt-0.5" style={{ color: '#7A6890' }}>{post.embed.url}</p>
           </div>
-          <ExternalLink size={13} style={{ color: '#7A6890' }} />
         </a>
       )}
 
       {/* Actions */}
       <div className="flex items-center gap-5 mt-4 pt-4" style={{ borderTop: '1px solid rgba(123,47,255,0.12)' }}>
         <button onClick={toggleLike}
-          className={`flex items-center gap-1.5 text-sm transition-all ${liked ? '' : 'hover:text-[#FF1A8C]'}`}
+          className="flex items-center gap-1.5 text-sm transition-all hover:text-[#FF1A8C]"
           style={{ color: liked ? '#FF1A8C' : '#7A6890' }}>
           <Heart size={18} fill={liked ? 'currentColor' : 'none'} />
           <span>{likeCount}</span>
@@ -273,8 +328,11 @@ export default function PostCard({ post }: { post: PostData }) {
           <MessageCircle size={18} />
           <span>{post.comments}</span>
         </button>
-        <button className="flex items-center gap-1.5 text-sm transition-colors hover:text-white ml-auto" style={{ color: '#7A6890' }}>
-          <Share2 size={18} />
+        <button onClick={handleShare}
+          className="flex items-center gap-1.5 text-sm transition-colors hover:text-white ml-auto"
+          style={{ color: copied ? '#A855F7' : '#7A6890' }}>
+          {copied ? <Check size={18} /> : <Share2 size={18} />}
+          {copied && <span className="text-xs">¡Copiado!</span>}
         </button>
       </div>
     </article>

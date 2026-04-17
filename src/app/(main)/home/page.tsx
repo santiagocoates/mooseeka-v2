@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import CreatePost from '@/components/feed/CreatePost'
 import PostCard, { PostData } from '@/components/feed/PostCard'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 interface TrendingProfile {
   id: string
@@ -85,6 +86,7 @@ function mapDbPostToPostData(row: Record<string, unknown>): PostData {
 }
 
 export default function HomePage() {
+  const currentUser = useCurrentUser()
   const [posts,    setPosts]    = useState<PostData[]>([])
   const [trending, setTrending] = useState<TrendingProfile[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -119,6 +121,10 @@ export default function HomePage() {
 
   function handleNewPost(post: PostData) {
     setPosts(prev => [post, ...prev])
+  }
+
+  function handleDelete(id: string) {
+    setPosts(prev => prev.filter(p => p.id !== id))
   }
 
   return (
@@ -196,7 +202,12 @@ export default function HomePage() {
         )}
 
         {!loading && posts.map(post => (
-          <PostCard key={post.id} post={post} />
+          <PostCard
+            key={post.id}
+            post={post}
+            currentUsername={currentUser?.username}
+            onDelete={handleDelete}
+          />
         ))}
       </div>
     </div>
