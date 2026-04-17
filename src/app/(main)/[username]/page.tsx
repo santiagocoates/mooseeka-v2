@@ -76,6 +76,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [currentUserId, setCurrentUserId]   = useState<string | null>(null)
+  const [isFollowing, setIsFollowing]   = useState(false)
+  const [followLoading, setFollowLoading] = useState(false)
   const [loading, setLoading]           = useState(true)
   const [notFound, setNotFound]         = useState(false)
   const [editOpen, setEditOpen]         = useState(false)
@@ -99,20 +101,51 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
     setProfile(profileData)
 
-    const [{ count: followers }, { count: following }, { data: svcs }] = await Promise.all([
+    const queries: Promise<unknown>[] = [
       supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id),
       supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id),
       supabase.from('services').select('id, title, price, currency, category, rating_avg, rating_count')
         .eq('seller_id', profileData.id).eq('is_active', true).limit(6),
-    ])
+    ]
+    if (user) {
+      queries.push(
+        supabase.from('follows').select('*', { count: 'exact', head: true })
+          .eq('follower_id', user.id).eq('following_id', profileData.id)
+      )
+    }
 
-    setFollowersCount(followers ?? 0)
-    setFollowingCount(following ?? 0)
-    setServices(svcs ?? [])
+    const results = await Promise.all(queries)
+    const [followersRes, followingRes, svcsRes] = results as [
+      { count: number | null }, { count: number | null }, { data: Service[] | null }, { count: number | null }?
+    ]
+
+    setFollowersCount(followersRes.count ?? 0)
+    setFollowingCount(followingRes.count ?? 0)
+    setServices(svcsRes.data ?? [])
+    if (user && results[3]) {
+      setIsFollowing(((results[3] as { count: number | null }).count ?? 0) > 0)
+    }
     setLoading(false)
   }, [username])
 
   useEffect(() => { loadProfile() }, [loadProfile])
+
+  async function toggleFollow() {
+    if (!currentUserId || !profile || followLoading) return
+    setFollowLoading(true)
+    const supabase = createClient()
+    if (isFollowing) {
+      await supabase.from('follows').delete()
+        .eq('follower_id', currentUserId).eq('following_id', profile.id)
+      setIsFollowing(false)
+      setFollowersCount(c => c - 1)
+    } else {
+      await supabase.from('follows').insert({ follower_id: currentUserId, following_id: profile.id })
+      setIsFollowing(true)
+      setFollowersCount(c => c + 1)
+    }
+    setFollowLoading(false)
+  }
 
   if (loading) return <ProfileSkeleton />
   if (notFound) return <NotFound />
@@ -169,8 +202,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                   onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)')}>
                   Contactar
                 </button>
-                <button className="text-white font-bold text-xs md:text-sm px-3 md:px-5 py-2 rounded-full hover:opacity-90 transition-all gradient-magenta glow-btn">
-                  Seguir
+                <button
+                  onClick={toggleFollow}
+                  disabled={followLoading}
+                  className="font-bold text-xs md:text-sm px-3 md:px-5 py-2 rounded-full transition-all disabled:opacity-60"
+                  style={isFollowing
+                    ? { border: '1px solid rgba(123,47,255,0.5)', color: '#C0A8D8', background: 'transparent' }
+                    : { background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)', color: '#fff' }}
+                  onMouseOver={e => { if (isFollowing) e.currentTarget.style.borderColor = 'rgba(255,50,50,0.6)'; e.currentTarget.style.color = isFollowing ? '#ff6b6b' : '#fff' }}
+                  onMouseOut={e => { if (isFollowing) e.currentTarget.style.borderColor = 'rgba(123,47,255,0.5)'; e.currentTarget.style.color = isFollowing ? '#C0A8D8' : '#fff' }}>
+                  {followLoading ? '...' : isFollowing ? 'Siguiendo' : 'Seguir'}
                 </button>
               </>
             )}
