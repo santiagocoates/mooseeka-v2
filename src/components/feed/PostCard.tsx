@@ -2,8 +2,33 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, Trash2, Link2, Check } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, Trash2, Link2, Check, Send, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+
+/* ── Comment interface ────────────────────────────── */
+interface Comment {
+  id: string
+  content: string
+  created_at: string
+  profile: {
+    id: string
+    name: string
+    username: string
+    avatar_url: string | null
+  }
+}
+
+function timeAgo(dateStr: string): string {
+  const diff  = Date.now() - new Date(dateStr).getTime()
+  const mins  = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days  = Math.floor(diff / 86400000)
+  if (mins  < 1)  return 'ahora'
+  if (mins  < 60) return `${mins}m`
+  if (hours < 24) return `${hours}h`
+  if (days  < 7)  return `${days}d`
+  return new Date(dateStr).toLocaleDateString('es', { day: 'numeric', month: 'short' })
+}
 
 /* ── Audio Player ─────────────────────────────────── */
 function AudioPlayer({ src, fileName }: { src: string; fileName?: string }) {
@@ -136,15 +161,64 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, currentUsername, currentUserId, onDelete }: PostCardProps) {
-  const [liked,       setLiked]       = useState(post.liked ?? false)
-  const [likeCount,   setLikeCount]   = useState(post.likes)
-  const [menuOpen,    setMenuOpen]    = useState(false)
-  const [deleting,    setDeleting]    = useState(false)
-  const [copied,      setCopied]      = useState(false)
+  const [liked,           setLiked]           = useState(post.liked ?? false)
+  const [likeCount,       setLikeCount]       = useState(post.likes)
+  const [menuOpen,        setMenuOpen]        = useState(false)
+  const [deleting,        setDeleting]        = useState(false)
+  const [copied,          setCopied]          = useState(false)
+  const [commentsOpen,    setCommentsOpen]    = useState(false)
+  const [comments,        setComments]        = useState<Comment[]>([])
+  const [commentCount,    setCommentCount]    = useState(post.comments)
+  const [loadingComments, setLoadingComments] = useState(false)
+  const [commentText,     setCommentText]     = useState('')
+  const [submitting,      setSubmitting]      = useState(false)
+  const commentInputRef = useRef<HTMLInputElement>(null)
 
   const isOwner = !!currentUsername && currentUsername === post.author.username
   const color   = TYPE_COLORS[post.type] ?? '#8b5cf6'
   const label   = TYPE_LABELS[post.type] ?? 'Post'
+
+  async function openComments() {
+    const next = !commentsOpen
+    setCommentsOpen(next)
+    if (next && comments.length === 0) {
+      setLoadingComments(true)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('comments')
+        .select('id, content, created_at, profile:profiles(id, name, username, avatar_url)')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: true })
+        .limit(50)
+      setComments((data as unknown as Comment[]) ?? [])
+      setLoadingComments(false)
+      setTimeout(() => commentInputRef.current?.focus(), 100)
+    }
+  }
+
+  async function submitComment() {
+    if (!currentUserId || !commentText.trim() || submitting) return
+    setSubmitting(true)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('comments')
+      .insert({ post_id: post.id, profile_id: currentUserId, content: commentText.trim() })
+      .select('id, content, created_at, profile:profiles(id, name, username, avatar_url)')
+      .single()
+    if (!error && data) {
+      setComments(prev => [...prev, data as unknown as Comment])
+      setCommentCount(prev => prev + 1)
+      setCommentText('')
+    }
+    setSubmitting(false)
+  }
+
+  async function deleteComment(commentId: string) {
+    const supabase = createClient()
+    await supabase.from('comments').delete().eq('id', commentId)
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    setCommentCount(prev => prev - 1)
+  }
 
   async function toggleLike() {
     if (!currentUserId) return
@@ -344,9 +418,11 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
           <Heart size={18} fill={liked ? 'currentColor' : 'none'} />
           <span>{likeCount}</span>
         </button>
-        <button className="flex items-center gap-1.5 text-sm transition-colors hover:text-white" style={{ color: '#7A6890' }}>
-          <MessageCircle size={18} />
-          <span>{post.comments}</span>
+        <button onClick={openComments}
+          className="flex items-center gap-1.5 text-sm transition-colors hover:text-white"
+          style={{ color: commentsOpen ? '#A855F7' : '#7A6890' }}>
+          <MessageCircle size={18} fill={commentsOpen ? 'currentColor' : 'none'} />
+          <span>{commentCount}</span>
         </button>
         <button onClick={handleShare}
           className="flex items-center gap-1.5 text-sm transition-colors hover:text-white ml-auto"
@@ -355,6 +431,102 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
           {copied && <span className="text-xs">¡Copiado!</span>}
         </button>
       </div>
+
+      {/* Comments panel */}
+      {commentsOpen && (
+        <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(123,47,255,0.1)' }}>
+
+          {/* Loading */}
+          {loadingComments && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 size={18} className="animate-spin" style={{ color: '#7A6890' }} />
+            </div>
+          )}
+
+          {/* Lista de comentarios */}
+          {!loadingComments && (
+            <div className="flex flex-col gap-3 mb-3">
+              {comments.length === 0 && (
+                <p className="text-xs text-center py-2" style={{ color: '#7A6890' }}>
+                  Sin comentarios. ¡Sé el primero!
+                </p>
+              )}
+              {comments.map(comment => (
+                <div key={comment.id} className="flex gap-2.5 group">
+                  {/* Avatar */}
+                  <Link href={`/${comment.profile.username}`} className="shrink-0 mt-0.5">
+                    {comment.profile.avatar_url ? (
+                      <img src={comment.profile.avatar_url} alt={comment.profile.name}
+                        className="w-7 h-7 rounded-full object-cover"
+                        style={{ border: '1px solid rgba(123,47,255,0.3)' }} />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                        style={{ background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)' }}>
+                        {comment.profile.name[0]?.toUpperCase()}
+                      </div>
+                    )}
+                  </Link>
+                  {/* Bubble */}
+                  <div className="flex-1 min-w-0">
+                    <div className="inline-block px-3 py-2 rounded-xl rounded-tl-sm max-w-full"
+                      style={{ background: 'rgba(123,47,255,0.12)', border: '1px solid rgba(123,47,255,0.15)' }}>
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <Link href={`/${comment.profile.username}`}
+                          className="text-xs font-bold text-white hover:underline shrink-0">
+                          {comment.profile.name}
+                        </Link>
+                        <span className="text-[10px]" style={{ color: '#7A6890' }}>
+                          {timeAgo(comment.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#C0A8D8' }}>
+                        {comment.content}
+                      </p>
+                    </div>
+                    {/* Delete — solo el autor */}
+                    {currentUserId === comment.profile.id && (
+                      <button
+                        onClick={() => deleteComment(comment.id)}
+                        className="text-[10px] mt-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400"
+                        style={{ color: '#7A6890' }}>
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Input nuevo comentario */}
+          {currentUserId && (
+            <div className="flex gap-2 mt-2">
+              <input
+                ref={commentInputRef}
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
+                placeholder="Escribí un comentario..."
+                maxLength={300}
+                className="flex-1 text-white placeholder-[#7A6890] text-xs px-3 py-2.5 rounded-xl focus:outline-none transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(123,47,255,0.2)' }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.5)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.2)')}
+              />
+              <button
+                onClick={submitComment}
+                disabled={!commentText.trim() || submitting}
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)' }}>
+                {submitting
+                  ? <Loader2 size={15} className="animate-spin text-white" />
+                  : <Send size={15} className="text-white" />
+                }
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </article>
   )
 }
