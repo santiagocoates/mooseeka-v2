@@ -122,6 +122,7 @@ export default function HomePage() {
     }
 
     const { data, error } = await postsQuery
+    console.log('[feed] posts result:', { count: data?.length, error, data })
     if (error || !data) { setLoading(false); return }
 
     const postIds = data.map(p => p.id as string)
