@@ -1,43 +1,120 @@
 'use client'
 
-import { useState } from 'react'
-import { Search, Star } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Search, UserPlus, UserCheck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
-const TRENDING_ARTISTS = [
-  { name: 'DistroDub', genre: 'Jazz', followers: 8, avatar: '/users/user2.jpg' },
-  { name: 'Valentina R.', genre: 'Alternative', followers: 1, avatar: '/users/user3.jpg' },
-  { name: 'Adrede', genre: 'Alternative', followers: 3, avatar: '/users/artistas.jpg' },
-  { name: 'Enzo Aguilar', genre: 'Rock', followers: 2, avatar: '/users/manager.jpg' },
-  { name: 'Patricia V.', genre: 'World', followers: 2, avatar: '/users/user1.jpg' },
-]
+interface Profile {
+  id: string
+  name: string
+  username: string
+  avatar_url: string | null
+  roles: string[] | null
+  bio: string | null
+}
 
-const TOP_SERVICES = [
-  { id: '1', title: 'Mastering Profesional', seller: 'Marta Sound', price: '€45/track', rating: 5.0, reviews: 127, avatar: '/users/productores.jpg' },
-  { id: '2', title: 'Producción de Trap', seller: 'Acid Beat', price: '€60/track', rating: 4.9, reviews: 95, avatar: '/users/user2.jpg' },
-  { id: '3', title: 'Sesión de Fotos', seller: 'Creative Lens', price: 'Desde €120', rating: 5.0, reviews: 43, avatar: '/users/disenadores.jpg' },
-]
-
-const TOP_PROS = [
-  { name: 'Elena Ríos', role: 'Productora · Ingeniera', avatar: '/users/productores.jpg', rating: 5.0 },
-  { name: 'Carlos Beats', role: 'Productor · DJ', avatar: '/users/user2.jpg', rating: 4.9 },
-  { name: 'Lina Vox', role: 'Cantante · Compositora', avatar: '/users/user3.jpg', rating: 4.8 },
+const ALL_ROLES = [
+  'Artista', 'Productor', 'DJ', 'Compositor', 'Cantante',
+  'Ingeniero de mezcla', 'Masterización', 'Manager',
+  'Diseñador', 'Videógrafo', 'Fotógrafo',
 ]
 
 export default function ExplorePage() {
-  const [search, setSearch] = useState('')
+  const currentUser = useCurrentUser()
+  const [search,      setSearch]      = useState('')
+  const [activeRole,  setActiveRole]  = useState<string | null>(null)
+  const [profiles,    setProfiles]    = useState<Profile[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [following,   setFollowing]   = useState<Set<string>>(new Set())
+  const [toggling,    setToggling]    = useState<Set<string>>(new Set())
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cargar perfiles que sigo actualmente
+  useEffect(() => {
+    if (!currentUser) return
+    const supabase = createClient()
+    supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', currentUser.id)
+      .then(({ data }) => {
+        if (data) setFollowing(new Set(data.map(r => r.following_id)))
+      })
+  }, [currentUser])
+
+  const fetchProfiles = useCallback(async (q: string, role: string | null) => {
+    setLoading(true)
+    const supabase = createClient()
+    let query = supabase
+      .from('profiles')
+      .select('id, name, username, avatar_url, roles, bio')
+      .eq('onboarding_completed', true)
+      .limit(24)
+
+    if (q.trim()) {
+      query = query.ilike('name', `%${q.trim()}%`)
+    }
+    if (role) {
+      query = query.contains('roles', [role])
+    }
+    if (!q.trim() && !role) {
+      query = query.order('created_at', { ascending: false })
+    }
+
+    const { data } = await query
+    setProfiles((data ?? []).filter(p => p.id !== currentUser?.id))
+    setLoading(false)
+  }, [currentUser?.id])
+
+  // Debounce en el input de búsqueda
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      fetchProfiles(search, activeRole)
+    }, 300)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [search, activeRole, fetchProfiles])
+
+  async function toggleFollow(profileId: string) {
+    if (!currentUser || toggling.has(profileId)) return
+    setToggling(prev => new Set(prev).add(profileId))
+    const supabase = createClient()
+    const isFollowing = following.has(profileId)
+
+    if (isFollowing) {
+      await supabase.from('follows')
+        .delete()
+        .eq('follower_id', currentUser.id)
+        .eq('following_id', profileId)
+      setFollowing(prev => { const s = new Set(prev); s.delete(profileId); return s })
+    } else {
+      await supabase.from('follows')
+        .insert({ follower_id: currentUser.id, following_id: profileId })
+      setFollowing(prev => new Set(prev).add(profileId))
+    }
+    setToggling(prev => { const s = new Set(prev); s.delete(profileId); return s })
+  }
+
+  const isSearching = search.trim() !== '' || activeRole !== null
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-6 flex flex-col gap-8">
-      <h1 className="text-white text-2xl font-black" style={{ letterSpacing: '-0.02em' }}>Explora.</h1>
+    <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-6">
+
+      {/* Header */}
+      <h1 className="text-white text-2xl font-black" style={{ letterSpacing: '-0.02em' }}>
+        Explora.
+      </h1>
 
       {/* Search */}
       <div className="relative">
-        <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#7A6890' }} />
+        <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ color: '#7A6890' }} />
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar profesionales, servicios, contenido..."
+          placeholder="Buscar por nombre..."
           className="w-full text-white placeholder-[#7A6890] pl-11 pr-4 py-3.5 rounded-xl focus:outline-none text-sm transition-colors"
           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(123,47,255,0.25)' }}
           onFocus={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.55)')}
@@ -45,117 +122,145 @@ export default function ExplorePage() {
         />
       </div>
 
-      {/* Trending Artists */}
-      <section>
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-xl">🔥</span>
-          <h2 className="text-white text-lg font-black" style={{ letterSpacing: '-0.02em' }}>Tendencias Artistas</h2>
-        </div>
-        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-          {TRENDING_ARTISTS.map(artist => (
-            <div key={artist.name} className="flex flex-col items-center gap-3 min-w-[110px]">
-              <div className="relative">
-                <img src={artist.avatar} alt={artist.name}
-                  className="w-20 h-20 rounded-full object-cover"
-                  style={{ border: '2px solid rgba(123,47,255,0.5)' }} />
-                <div className="absolute inset-0 rounded-full"
-                  style={{ background: 'linear-gradient(135deg, rgba(139,63,255,0.15), rgba(255,26,140,0.15))' }} />
+      {/* Filtro por rol */}
+      <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+        <button
+          onClick={() => setActiveRole(null)}
+          className="shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all"
+          style={{
+            background: activeRole === null ? 'linear-gradient(135deg,#8B3FFF,#FF1A8C)' : 'rgba(255,255,255,0.06)',
+            color: activeRole === null ? '#fff' : '#7A6890',
+            border: activeRole === null ? 'none' : '1px solid rgba(123,47,255,0.2)',
+          }}>
+          Todos
+        </button>
+        {ALL_ROLES.map(role => (
+          <button
+            key={role}
+            onClick={() => setActiveRole(activeRole === role ? null : role)}
+            className="shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all"
+            style={{
+              background: activeRole === role ? 'linear-gradient(135deg,#8B3FFF,#FF1A8C)' : 'rgba(255,255,255,0.06)',
+              color: activeRole === role ? '#fff' : '#7A6890',
+              border: activeRole === role ? 'none' : '1px solid rgba(123,47,255,0.2)',
+            }}>
+            {role}
+          </button>
+        ))}
+      </div>
+
+      {/* Título sección */}
+      <div className="flex items-center gap-2">
+        <span className="text-base">{isSearching ? '🔍' : '🔥'}</span>
+        <h2 className="text-white font-bold text-sm">
+          {isSearching ? 'Resultados' : 'Perfiles recientes'}
+        </h2>
+        {!loading && (
+          <span className="text-xs ml-auto" style={{ color: '#7A6890' }}>
+            {profiles.length} {profiles.length === 1 ? 'perfil' : 'perfiles'}
+          </span>
+        )}
+      </div>
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex flex-col gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="rounded-2xl p-4 animate-pulse flex gap-4"
+              style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
+              <div className="w-14 h-14 rounded-full shrink-0"
+                style={{ background: 'rgba(123,47,255,0.2)' }} />
+              <div className="flex-1 flex flex-col gap-2 justify-center">
+                <div className="h-3 w-36 rounded" style={{ background: 'rgba(123,47,255,0.15)' }} />
+                <div className="h-2 w-24 rounded" style={{ background: 'rgba(123,47,255,0.1)' }} />
               </div>
-              <div className="text-center">
-                <p className="text-white text-sm font-semibold">{artist.name}</p>
-                <p className="text-xs" style={{ color: '#7A6890' }}>{artist.genre}</p>
-                <p className="text-xs" style={{ color: '#7A6890' }}>{artist.followers} seguidores</p>
-              </div>
-              <button className="text-xs font-bold px-4 py-1.5 rounded-full transition-all"
-                style={{ border: '1px solid rgba(255,26,140,0.5)', color: '#FF1A8C' }}
-                onMouseOver={e => { e.currentTarget.style.background = '#FF1A8C'; e.currentTarget.style.color = '#fff' }}
-                onMouseOut={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '#FF1A8C' }}>
-                Seguir
-              </button>
             </div>
           ))}
         </div>
-        <button className="text-sm mt-3 transition-colors hover:opacity-80" style={{ color: '#A855F7' }}>
-          Ver todas las tendencias →
-        </button>
-      </section>
+      )}
 
-      {/* Top Services */}
-      <section>
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-xl">⭐</span>
-          <div>
-            <h2 className="text-white text-lg font-black" style={{ letterSpacing: '-0.02em' }}>Top Servicios</h2>
-            <p className="text-xs" style={{ color: '#7A6890' }}>Los más contratados esta semana</p>
-          </div>
+      {/* Sin resultados */}
+      {!loading && profiles.length === 0 && (
+        <div className="rounded-2xl p-10 text-center"
+          style={{ background: 'rgba(25,0,50,0.4)', border: '1px dashed rgba(123,47,255,0.25)' }}>
+          <p className="text-3xl mb-3">🎵</p>
+          <p className="text-white font-semibold text-sm mb-1">
+            {isSearching ? 'Sin resultados' : 'Aún no hay perfiles'}
+          </p>
+          <p className="text-xs" style={{ color: '#7A6890' }}>
+            {isSearching ? 'Probá con otro nombre o rol.' : 'Sé el primero en unirte.'}
+          </p>
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          {TOP_SERVICES.map(service => (
-            <Link key={service.id} href={`/services/${service.id}`}
-              className="rounded-2xl overflow-hidden transition-all group block"
-              style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}
-              onMouseOver={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.45)')}
-              onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.18)')}
-            >
-              <div className="h-28 overflow-hidden">
-                <img src={service.avatar} alt={service.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="p-3">
-                <p className="text-white font-bold text-sm group-hover:text-[#FF1A8C] transition-colors mb-1 line-clamp-1">{service.title}</p>
-                <p className="text-xs mb-2" style={{ color: '#7A6890' }}>{service.seller}</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Star size={11} className="text-yellow-400" fill="currentColor" />
-                    <span className="text-white text-xs font-semibold">{service.rating}</span>
-                    <span className="text-xs" style={{ color: '#7A6890' }}>({service.reviews})</span>
-                  </div>
-                  <span className="text-white font-black text-sm">{service.price}</span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-        <button className="text-sm mt-3 transition-colors hover:opacity-80" style={{ color: '#A855F7' }}>
-          Ver todos los servicios →
-        </button>
-      </section>
+      )}
 
-      {/* Top Professionals */}
-      <section>
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-xl">👥</span>
-          <div>
-            <h2 className="text-white text-lg font-black" style={{ letterSpacing: '-0.02em' }}>Top Profesionales</h2>
-            <p className="text-xs" style={{ color: '#7A6890' }}>Más contratados este mes</p>
-          </div>
-        </div>
-        <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-          {TOP_PROS.map(pro => (
-            <div key={pro.name}
-              className="rounded-2xl p-5 flex flex-col items-center gap-3 min-w-[160px] transition-all"
-              style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}
-              onMouseOver={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.45)')}
-              onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.18)')}
-            >
-              <img src={pro.avatar} alt={pro.name}
-                className="w-16 h-16 rounded-full object-cover"
-                style={{ border: '2px solid rgba(123,47,255,0.45)' }} />
-              <div className="text-center">
-                <p className="text-white font-bold text-sm">{pro.name}</p>
-                <p className="text-xs" style={{ color: '#7A6890' }}>{pro.role}</p>
-                <div className="flex items-center justify-center gap-1 mt-1">
-                  <Star size={11} className="text-yellow-400" fill="currentColor" />
-                  <span className="text-white text-xs">{pro.rating}</span>
+      {/* Grid de perfiles */}
+      {!loading && profiles.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {profiles.map(profile => {
+            const isFollowing = following.has(profile.id)
+            const isToggling  = toggling.has(profile.id)
+            const roleStr     = profile.roles?.slice(0, 2).join(' · ') || 'Mooseeka'
+
+            return (
+              <div key={profile.id}
+                className="rounded-2xl p-4 flex items-center gap-4 transition-all"
+                style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}
+                onMouseOver={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.38)')}
+                onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.18)')}>
+
+                {/* Avatar */}
+                <Link href={`/${profile.username}`} className="shrink-0">
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} alt={profile.name}
+                      className="w-14 h-14 rounded-full object-cover"
+                      style={{ border: '2px solid rgba(123,47,255,0.4)' }} />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-white text-lg"
+                      style={{ background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)', border: '2px solid rgba(123,47,255,0.4)' }}>
+                      {profile.name[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </Link>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <Link href={`/${profile.username}`}
+                    className="text-white font-bold text-sm hover:underline truncate block">
+                    {profile.name}
+                  </Link>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: '#C0A8D8' }}>{roleStr}</p>
+                  {profile.bio && (
+                    <p className="text-xs mt-1 line-clamp-1" style={{ color: '#7A6890' }}>{profile.bio}</p>
+                  )}
                 </div>
+
+                {/* Follow button */}
+                {currentUser && (
+                  <button
+                    onClick={() => toggleFollow(profile.id)}
+                    disabled={isToggling}
+                    className="shrink-0 flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full transition-all"
+                    style={isFollowing ? {
+                      background: 'rgba(139,63,255,0.15)',
+                      color: '#A855F7',
+                      border: '1px solid rgba(139,63,255,0.4)',
+                    } : {
+                      background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)',
+                      color: '#fff',
+                    }}>
+                    {isToggling
+                      ? <Loader2 size={13} className="animate-spin" />
+                      : isFollowing
+                        ? <><UserCheck size={13} /> Siguiendo</>
+                        : <><UserPlus size={13} /> Seguir</>
+                    }
+                  </button>
+                )}
               </div>
-              <button className="text-white text-xs font-bold px-4 py-1.5 rounded-full hover:opacity-90 transition-all w-full gradient-magenta glow-btn">
-                Ver perfil
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
-      </section>
+      )}
     </div>
   )
 }
