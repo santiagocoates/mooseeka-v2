@@ -131,10 +131,11 @@ function getDomain(url: string) {
 interface PostCardProps {
   post: PostData
   currentUsername?: string
+  currentUserId?: string
   onDelete?: (id: string) => void
 }
 
-export default function PostCard({ post, currentUsername, onDelete }: PostCardProps) {
+export default function PostCard({ post, currentUsername, currentUserId, onDelete }: PostCardProps) {
   const [liked,       setLiked]       = useState(post.liked ?? false)
   const [likeCount,   setLikeCount]   = useState(post.likes)
   const [menuOpen,    setMenuOpen]    = useState(false)
@@ -145,9 +146,28 @@ export default function PostCard({ post, currentUsername, onDelete }: PostCardPr
   const color   = TYPE_COLORS[post.type] ?? '#8b5cf6'
   const label   = TYPE_LABELS[post.type] ?? 'Post'
 
-  function toggleLike() {
-    setLiked(prev => !prev)
-    setLikeCount(prev => liked ? prev - 1 : prev + 1)
+  async function toggleLike() {
+    if (!currentUserId) return
+    const supabase = createClient()
+    const wasLiked = liked
+
+    // Optimistic update
+    setLiked(!wasLiked)
+    setLikeCount(prev => wasLiked ? prev - 1 : prev + 1)
+
+    if (wasLiked) {
+      const { error } = await supabase
+        .from('post_likes')
+        .delete()
+        .eq('post_id', post.id)
+        .eq('user_id', currentUserId)
+      if (error) { setLiked(true); setLikeCount(prev => prev + 1) }
+    } else {
+      const { error } = await supabase
+        .from('post_likes')
+        .insert({ post_id: post.id, user_id: currentUserId })
+      if (error) { setLiked(false); setLikeCount(prev => prev - 1) }
+    }
   }
 
   async function handleDelete() {

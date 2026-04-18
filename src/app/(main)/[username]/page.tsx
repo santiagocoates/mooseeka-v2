@@ -101,20 +101,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
     setProfile(profileData)
 
-    const queries: Promise<unknown>[] = [
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id),
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id),
-      supabase.from('services').select('id, title, price, currency, category, rating_avg, rating_count')
-        .eq('seller_id', profileData.id).eq('is_active', true).limit(6),
-    ]
-    if (user) {
-      queries.push(
-        supabase.from('follows').select('*', { count: 'exact', head: true })
+    const followersQ = supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id)
+    const followingQ = supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id)
+    const svcsQ      = supabase.from('services').select('id, title, price, currency, category, rating_avg, rating_count')
+      .eq('seller_id', profileData.id).eq('is_active', true).limit(6)
+    const isFollowQ  = user
+      ? supabase.from('follows').select('*', { count: 'exact', head: true })
           .eq('follower_id', user.id).eq('following_id', profileData.id)
-      )
-    }
+      : Promise.resolve({ count: null })
 
-    const results = await Promise.all(queries)
+    const results = await Promise.all([followersQ, followingQ, svcsQ, isFollowQ])
     const [followersRes, followingRes, svcsRes] = results as [
       { count: number | null }, { count: number | null }, { data: Service[] | null }, { count: number | null }?
     ]

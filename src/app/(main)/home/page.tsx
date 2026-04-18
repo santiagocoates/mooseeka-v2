@@ -93,13 +93,38 @@ export default function HomePage() {
 
   const loadFeed = useCallback(async () => {
     const supabase = createClient()
+
+    // Usuario autenticado (para saber qué posts ya likeó)
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+
     const { data } = await supabase
       .from('posts')
       .select('*, profile:profiles(id, name, username, avatar_url, roles)')
       .order('created_at', { ascending: false })
       .limit(30)
 
-    if (data) setPosts(data.map(mapDbPostToPostData))
+    if (!data) { setLoading(false); return }
+
+    const postIds = data.map(p => p.id as string)
+
+    // Likes: conteo por post + cuáles likeó el usuario actual
+    const { data: likesData } = await supabase
+      .from('post_likes')
+      .select('post_id, user_id')
+      .in('post_id', postIds)
+
+    const likeCountMap: Record<string, number> = {}
+    const userLikedSet = new Set<string>()
+    for (const like of likesData ?? []) {
+      likeCountMap[like.post_id] = (likeCountMap[like.post_id] ?? 0) + 1
+      if (like.user_id === authUser?.id) userLikedSet.add(like.post_id)
+    }
+
+    setPosts(data.map(row => ({
+      ...mapDbPostToPostData(row),
+      likes: likeCountMap[row.id as string] ?? 0,
+      liked: userLikedSet.has(row.id as string),
+    })))
     setLoading(false)
   }, [])
 
@@ -206,6 +231,7 @@ export default function HomePage() {
             key={post.id}
             post={post}
             currentUsername={currentUser?.username}
+            currentUserId={currentUser?.id}
             onDelete={handleDelete}
           />
         ))}
