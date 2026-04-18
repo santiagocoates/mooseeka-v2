@@ -90,19 +90,37 @@ export default function HomePage() {
   const [posts,    setPosts]    = useState<PostData[]>([])
   const [trending, setTrending] = useState<TrendingProfile[]>([])
   const [loading,  setLoading]  = useState(true)
+  const [feedTab,  setFeedTab]  = useState<'forYou' | 'following'>('forYou')
 
-  const loadFeed = useCallback(async () => {
+  const loadFeed = useCallback(async (tab: 'forYou' | 'following') => {
+    setLoading(true)
     const supabase = createClient()
 
     // Usuario autenticado (para saber qué posts ya likeó)
     const { data: { user: authUser } } = await supabase.auth.getUser()
 
-    const { data } = await supabase
+    let postsQuery = supabase
       .from('posts')
       .select('*, profile:profiles(id, name, username, avatar_url, roles)')
       .order('created_at', { ascending: false })
       .limit(30)
 
+    // Tab "Siguiendo": filtrar por perfiles que sigue el usuario
+    if (tab === 'following' && authUser) {
+      const { data: followsData } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', authUser.id)
+      const followingIds = (followsData ?? []).map(f => f.following_id)
+      if (followingIds.length === 0) {
+        setPosts([])
+        setLoading(false)
+        return
+      }
+      postsQuery = postsQuery.in('profile_id', followingIds)
+    }
+
+    const { data } = await postsQuery
     if (!data) { setLoading(false); return }
 
     const postIds = data.map(p => p.id as string)
@@ -140,9 +158,9 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
-    loadFeed()
+    loadFeed(feedTab)
     loadTrending()
-  }, [loadFeed, loadTrending])
+  }, [loadFeed, loadTrending, feedTab])
 
   function handleNewPost(post: PostData) {
     setPosts(prev => [post, ...prev])
@@ -195,6 +213,24 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Toggle Para ti / Siguiendo */}
+        <div className="flex rounded-xl p-1 gap-1"
+          style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
+          {(['forYou', 'following'] as const).map(tab => (
+            <button key={tab}
+              onClick={() => setFeedTab(tab)}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all"
+              style={feedTab === tab ? {
+                background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)',
+                color: '#fff',
+              } : {
+                color: '#7A6890',
+              }}>
+              {tab === 'forYou' ? 'Para ti' : 'Siguiendo'}
+            </button>
+          ))}
+        </div>
+
         {/* Feed */}
         {loading && (
           <div className="flex flex-col gap-4">
@@ -218,10 +254,14 @@ export default function HomePage() {
         {!loading && posts.length === 0 && (
           <div className="rounded-2xl p-10 text-center"
             style={{ background: 'rgba(25,0,50,0.4)', border: '1px dashed rgba(123,47,255,0.25)' }}>
-            <p className="text-3xl mb-3">🎵</p>
-            <p className="text-white font-semibold text-sm mb-1">El feed está vacío</p>
+            <p className="text-3xl mb-3">{feedTab === 'following' ? '👥' : '🎵'}</p>
+            <p className="text-white font-semibold text-sm mb-1">
+              {feedTab === 'following' ? 'Tu feed de seguidos está vacío' : 'El feed está vacío'}
+            </p>
             <p className="text-xs" style={{ color: '#7A6890' }}>
-              Sé el primero en publicar algo.
+              {feedTab === 'following'
+                ? 'Seguí a otros músicos para ver sus posts acá.'
+                : 'Sé el primero en publicar algo.'}
             </p>
           </div>
         )}
