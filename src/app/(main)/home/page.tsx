@@ -96,8 +96,9 @@ export default function HomePage() {
     setLoading(true)
     const supabase = createClient()
 
-    // Usuario autenticado (para saber qué posts ya likeó)
-    const { data: { user: authUser } } = await supabase.auth.getUser()
+    // getSession() lee de memoria local — no hace llamada de red, disponible inmediatamente
+    const { data: { session } } = await supabase.auth.getSession()
+    const authUserId = session?.user?.id ?? null
 
     let postsQuery = supabase
       .from('posts')
@@ -106,11 +107,11 @@ export default function HomePage() {
       .limit(30)
 
     // Tab "Siguiendo": filtrar por perfiles que sigue el usuario
-    if (tab === 'following' && authUser) {
+    if (tab === 'following' && authUserId) {
       const { data: followsData } = await supabase
         .from('follows')
         .select('following_id')
-        .eq('follower_id', authUser.id)
+        .eq('follower_id', authUserId)
       const followingIds = (followsData ?? []).map(f => f.following_id)
       if (followingIds.length === 0) {
         setPosts([])
@@ -120,22 +121,25 @@ export default function HomePage() {
       postsQuery = postsQuery.in('profile_id', followingIds)
     }
 
-    const { data } = await postsQuery
-    if (!data) { setLoading(false); return }
+    const { data, error } = await postsQuery
+    if (error || !data) { setLoading(false); return }
 
     const postIds = data.map(p => p.id as string)
 
-    // Likes: conteo por post + cuáles likeó el usuario actual
-    const { data: likesData } = await supabase
-      .from('post_likes')
-      .select('post_id, user_id')
-      .in('post_id', postIds)
-
+    // Likes: solo si hay posts y hay sesión activa
     const likeCountMap: Record<string, number> = {}
     const userLikedSet = new Set<string>()
-    for (const like of likesData ?? []) {
-      likeCountMap[like.post_id] = (likeCountMap[like.post_id] ?? 0) + 1
-      if (like.user_id === authUser?.id) userLikedSet.add(like.post_id)
+
+    if (postIds.length > 0) {
+      const { data: likesData } = await supabase
+        .from('post_likes')
+        .select('post_id, user_id')
+        .in('post_id', postIds)
+
+      for (const like of likesData ?? []) {
+        likeCountMap[like.post_id] = (likeCountMap[like.post_id] ?? 0) + 1
+        if (like.user_id === authUserId) userLikedSet.add(like.post_id)
+      }
     }
 
     setPosts(data.map(row => ({
