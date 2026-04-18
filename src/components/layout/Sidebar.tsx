@@ -3,21 +3,23 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, ShoppingBag, Compass, MessageSquare, User, Settings, LogOut, Package, ShieldCheck } from 'lucide-react'
+import { Home, ShoppingBag, Compass, Bell, User, Settings, LogOut, Package, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import { useNotifications } from '@/lib/hooks/useNotifications'
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const currentUser = useCurrentUser()
+  const { unreadCount } = useNotifications()
 
   const NAV_ITEMS = [
-    { href: '/home', icon: Home, label: 'Inicio' },
-    { href: '/market', icon: ShoppingBag, label: 'Market' },
-    { href: '/explore', icon: Compass, label: 'Explorar' },
-    { href: '/messages', icon: MessageSquare, label: 'Mensajes', badge: 2 },
-    { href: '/orders', icon: Package, label: 'Mis pedidos' },
+    { href: '/home',          icon: Home,        label: 'Inicio'        },
+    { href: '/market',        icon: ShoppingBag, label: 'Market'        },
+    { href: '/explore',       icon: Compass,     label: 'Explorar'      },
+    { href: '/notifications', icon: Bell,        label: 'Notificaciones', badge: unreadCount },
+    { href: '/orders',        icon: Package,     label: 'Mis pedidos'   },
     { href: currentUser ? `/${currentUser.username}` : '#', icon: User, label: 'Perfil' },
   ]
 

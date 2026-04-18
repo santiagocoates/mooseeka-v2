@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, Trash2, Link2, Check, Send, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { createNotification } from '@/lib/notifications'
 
 /* ── Comment interface ────────────────────────────── */
 interface Comment {
@@ -209,6 +210,16 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
       setComments(prev => [...prev, data as unknown as Comment])
       setCommentCount(prev => prev + 1)
       setCommentText('')
+      // Notificar al autor del post
+      const supabase2 = createClient()
+      const { data: postData } = await supabase2
+        .from('posts')
+        .select('profile_id')
+        .eq('id', post.id)
+        .single()
+      if (postData?.profile_id) {
+        createNotification({ userId: postData.profile_id, actorId: currentUserId, type: 'comment', postId: post.id })
+      }
     }
     setSubmitting(false)
   }
@@ -240,7 +251,20 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
       const { error } = await supabase
         .from('post_likes')
         .insert({ post_id: post.id, user_id: currentUserId })
-      if (error) { setLiked(false); setLikeCount(prev => prev - 1) }
+      if (!error) {
+        // Notificar al autor del post
+        const { data: postData } = await supabase
+          .from('posts')
+          .select('profile_id')
+          .eq('id', post.id)
+          .single()
+        if (postData?.profile_id) {
+          createNotification({ userId: postData.profile_id, actorId: currentUserId, type: 'like', postId: post.id })
+        }
+      } else {
+        setLiked(false)
+        setLikeCount(prev => prev - 1)
+      }
     }
   }
 

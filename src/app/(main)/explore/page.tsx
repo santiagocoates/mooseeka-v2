@@ -5,6 +5,7 @@ import { Search, UserPlus, UserCheck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import { createNotification } from '@/lib/notifications'
 
 interface Profile {
   id: string
@@ -93,6 +94,7 @@ export default function ExplorePage() {
       await supabase.from('follows')
         .insert({ follower_id: currentUser.id, following_id: profileId })
       setFollowing(prev => new Set(prev).add(profileId))
+      createNotification({ userId: profileId, actorId: currentUser.id, type: 'follow' })
     }
     setToggling(prev => { const s = new Set(prev); s.delete(profileId); return s })
   }
