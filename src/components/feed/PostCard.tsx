@@ -187,7 +187,7 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
       const supabase = createClient()
       const { data } = await supabase
         .from('comments')
-        .select('id, content, created_at, profile:profiles(id, name, username, avatar_url)')
+        .select('id, content, created_at, profile:profiles!comments_profile_id_fkey(id, name, username, avatar_url)')
         .eq('post_id', post.id)
         .order('created_at', { ascending: true })
         .limit(50)
@@ -204,7 +204,7 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
     const { data, error } = await supabase
       .from('comments')
       .insert({ post_id: post.id, profile_id: currentUserId, content: commentText.trim() })
-      .select('id, content, created_at, profile:profiles(id, name, username, avatar_url)')
+      .select('id, content, created_at, profile:profiles!comments_profile_id_fkey(id, name, username, avatar_url)')
       .single()
     if (!error && data) {
       setComments(prev => [...prev, data as unknown as Comment])

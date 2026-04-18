@@ -102,7 +102,7 @@ export default function HomePage() {
 
     let postsQuery = supabase
       .from('posts')
-      .select('*, profile:profiles(id, name, username, avatar_url, roles)')
+      .select('*, profile:profiles!posts_profile_id_fkey(id, name, username, avatar_url, roles)')
       .order('created_at', { ascending: false })
       .limit(30)
 
