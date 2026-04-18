@@ -160,7 +160,9 @@ export default function HomePage() {
   useEffect(() => {
     loadFeed(feedTab)
     loadTrending()
-  }, [loadFeed, loadTrending, feedTab])
+  // currentUser?.id: re-fetch cuando la sesión de auth carga (resuelve race condition en refresh)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedTab, currentUser?.id])
 
   function handleNewPost(post: PostData) {
     setPosts(prev => [post, ...prev])
