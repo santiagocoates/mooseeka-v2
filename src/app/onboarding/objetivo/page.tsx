@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, ShoppingBag, Briefcase, Users, Heart } from 'lucide-react'
+import { ArrowRight, ShoppingBag, Briefcase, Users, Heart, Check } from 'lucide-react'
 import StepProgress from '@/components/onboarding/StepProgress'
 import { useOnboarding } from '../context'
 
@@ -48,7 +48,15 @@ const OBJETIVOS = [
 export default function OnboardingObjetivo() {
   const router = useRouter()
   const { objetivo: savedObjetivo, update } = useOnboarding()
-  const [selected, setSelected] = useState<string>(savedObjetivo)
+  const [selected, setSelected] = useState<string[]>(
+    Array.isArray(savedObjetivo) ? savedObjetivo : savedObjetivo ? [savedObjetivo as unknown as string] : []
+  )
+
+  function toggle(id: string) {
+    setSelected(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
 
   function handleContinue() {
     update({ objetivo: selected })
@@ -64,15 +72,15 @@ export default function OnboardingObjetivo() {
           ¿Para qué usas Mooseeka?
         </h1>
         <p className="text-sm leading-relaxed" style={{ color: '#C0A8D8' }}>
-          Esto personaliza tu experiencia desde el primer día. Puedes cambiarlo cuando quieras.
+          Podés elegir varias opciones. Esto personaliza tu experiencia desde el primer día.
         </p>
       </div>
 
       <div className="flex flex-col gap-3 mb-8">
         {OBJETIVOS.map(({ id, icon: Icon, label, desc, color, bg, border }) => {
-          const isSelected = selected === id
+          const isSelected = selected.includes(id)
           return (
-            <button key={id} onClick={() => setSelected(id)}
+            <button key={id} onClick={() => toggle(id)}
               className="flex items-start gap-4 p-5 rounded-2xl text-left transition-all w-full"
               style={isSelected
                 ? { background: bg, border: `2px solid ${border}` }
@@ -87,18 +95,19 @@ export default function OnboardingObjetivo() {
                 <p className="text-white font-bold text-base mb-1">{label}</p>
                 <p className="text-sm leading-relaxed" style={{ color: '#C0A8D8' }}>{desc}</p>
               </div>
-              {isSelected && (
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shrink-0 mt-1 gradient-magenta">
-                  ✓
-                </div>
-              )}
+              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-1 transition-all"
+                style={isSelected
+                  ? { background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)', border: 'none' }
+                  : { background: 'transparent', border: '2px solid rgba(123,47,255,0.35)' }}>
+                {isSelected && <Check size={13} className="text-white" strokeWidth={3} />}
+              </div>
             </button>
           )
         })}
       </div>
 
       <button
-        disabled={!selected}
+        disabled={selected.length === 0}
         onClick={handleContinue}
         className="w-full py-3.5 rounded-full text-white font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 gradient-magenta glow-btn hover:opacity-90">
         Finalizar

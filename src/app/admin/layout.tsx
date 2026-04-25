@@ -4,14 +4,15 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Users, ShieldCheck, FileText, LogOut, ChevronRight
+  LayoutDashboard, Users, ShieldCheck, FileText, LogOut, ChevronRight, Package
 } from 'lucide-react'
 
 const NAV = [
-  { href: '/admin',          icon: LayoutDashboard, label: 'Dashboard'           },
-  { href: '/admin/sellers',  icon: ShieldCheck,     label: 'Solicitudes vendedor', badge: 4 },
-  { href: '/admin/users',    icon: Users,            label: 'Usuarios'            },
-  { href: '/admin/content',  icon: FileText,         label: 'Contenido'           },
+  { href: '/admin',           icon: LayoutDashboard, label: 'Dashboard'            },
+  { href: '/admin/products',  icon: Package,         label: 'Productos'            },
+  { href: '/admin/sellers',   icon: ShieldCheck,     label: 'Solicitudes vendedor', badge: 4 },
+  { href: '/admin/users',     icon: Users,           label: 'Usuarios'             },
+  { href: '/admin/content',   icon: FileText,        label: 'Contenido'            },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

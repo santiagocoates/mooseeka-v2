@@ -11,7 +11,7 @@ export interface OnboardingData {
   bannerPreview: string | null
   roles: string[]
   genres: string[]
-  objetivo: string
+  objetivo: string[]
 }
 
 interface OnboardingCtx extends OnboardingData {
@@ -30,7 +30,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     bannerPreview: null,
     roles: [],
     genres: [],
-    objetivo: '',
+    objetivo: [],
   })
 
   function update(patch: Partial<OnboardingData>) {
