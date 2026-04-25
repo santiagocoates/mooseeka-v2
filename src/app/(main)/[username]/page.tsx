@@ -1,7 +1,7 @@
 'use client'
 
 import { use, useState, useEffect, useCallback } from 'react'
-import { Pencil, Upload, MapPin, Calendar } from 'lucide-react'
+import { Pencil, Upload, MapPin, Calendar, BookOpen, Music, Package } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import EditProfileModal from '@/components/profile/EditProfileModal'
@@ -39,6 +39,28 @@ interface Service {
   rating_count: number
 }
 
+interface Product {
+  id: string
+  title: string
+  type: string
+  price_usd: number
+  cover_url: string | null
+}
+
+const PRODUCT_TYPE_LABELS: Record<string, string> = {
+  course:       'Curso',
+  beat:         'Beat',
+  sample_pack:  'Sample Pack',
+  preset_pack:  'Preset Pack',
+}
+
+const PRODUCT_TYPE_ICONS: Record<string, React.ReactNode> = {
+  course:       <BookOpen size={13} />,
+  beat:         <Music size={13} />,
+  sample_pack:  <Package size={13} />,
+  preset_pack:  <Package size={13} />,
+}
+
 function ProfileSkeleton() {
   return (
     <div className="max-w-4xl mx-auto animate-pulse">
@@ -73,6 +95,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   const [profile, setProfile]           = useState<Profile | null>(null)
   const [services, setServices]         = useState<Service[]>([])
+  const [products, setProducts]         = useState<Product[]>([])
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [currentUserId, setCurrentUserId]   = useState<string | null>(null)
@@ -105,21 +128,23 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const followingQ = supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id)
     const svcsQ      = supabase.from('services').select('id, title, price, currency, category, rating_avg, rating_count')
       .eq('seller_id', profileData.id).eq('is_active', true).limit(6)
+    const prodsQ     = supabase.from('products').select('id, title, type, price_usd, cover_url')
+      .eq('seller_id', profileData.id).eq('published', true).order('created_at', { ascending: false }).limit(6)
     const isFollowQ  = user
       ? supabase.from('follows').select('*', { count: 'exact', head: true })
           .eq('follower_id', user.id).eq('following_id', profileData.id)
       : Promise.resolve({ count: null })
 
-    const results = await Promise.all([followersQ, followingQ, svcsQ, isFollowQ])
-    const [followersRes, followingRes, svcsRes] = results as [
-      { count: number | null }, { count: number | null }, { data: Service[] | null }, { count: number | null }?
-    ]
+    const [followersRes, followingRes, svcsRes, isFollowRes, prodsRes] = await Promise.all([
+      followersQ, followingQ, svcsQ, isFollowQ, prodsQ,
+    ])
 
-    setFollowersCount(followersRes.count ?? 0)
-    setFollowingCount(followingRes.count ?? 0)
-    setServices(svcsRes.data ?? [])
-    if (user && results[3]) {
-      setIsFollowing(((results[3] as { count: number | null }).count ?? 0) > 0)
+    setFollowersCount((followersRes as { count: number | null }).count ?? 0)
+    setFollowingCount((followingRes as { count: number | null }).count ?? 0)
+    setServices((svcsRes as { data: Service[] | null }).data ?? [])
+    setProducts((prodsRes as { data: Product[] | null }).data ?? [])
+    if (user && isFollowRes) {
+      setIsFollowing(((isFollowRes as { count: number | null }).count ?? 0) > 0)
     }
     setLoading(false)
   }, [username])
@@ -269,6 +294,48 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
             {/* Experience */}
             <ExperienceSection profileId={profile.id} isOwner={isOwner} />
+
+            {/* Productos digitales */}
+            {products.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-bold">Productos</h3>
+                  <Link href="/market"
+                    className="text-xs font-semibold hover:opacity-70 transition-opacity"
+                    style={{ color: '#8B3FFF' }}>
+                    Ver market →
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {products.map(product => (
+                    <Link key={product.id} href={`/products/${product.id}`}
+                      className="rounded-xl overflow-hidden transition-all hover:scale-[1.02] group"
+                      style={{ background: 'rgba(25,0,50,0.6)', border: '1px solid rgba(123,47,255,0.18)' }}>
+                      <div className="w-full aspect-video overflow-hidden"
+                        style={{ background: 'linear-gradient(135deg,rgba(139,63,255,0.2),rgba(255,26,140,0.2))' }}>
+                        {product.cover_url
+                          ? <img src={product.cover_url} alt={product.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          : <div className="w-full h-full flex items-center justify-center text-2xl">🎵</div>
+                        }
+                      </div>
+                      <div className="p-3">
+                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold mb-1"
+                          style={{ background: 'rgba(139,63,255,0.12)', color: '#C0A8D8' }}>
+                          {PRODUCT_TYPE_ICONS[product.type]}
+                          {PRODUCT_TYPE_LABELS[product.type] ?? product.type}
+                        </div>
+                        <p className="text-white font-bold text-xs leading-tight line-clamp-2 mb-1">{product.title}</p>
+                        <p className="text-white font-black text-sm">
+                          ${Number(product.price_usd).toFixed(0)}
+                          <span className="text-[10px] font-medium ml-0.5" style={{ color: '#7A6890' }}>USD</span>
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Services */}
             {(services.length > 0 || isOwner) && (
