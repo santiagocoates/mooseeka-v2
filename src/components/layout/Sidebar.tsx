@@ -3,23 +3,20 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, ShoppingBag, Compass, Bell, User, Settings, LogOut, Package, ShieldCheck, BookMarked } from 'lucide-react'
+import { Home, ShoppingBag, Compass, User, Settings, LogOut, ShieldCheck, BookMarked } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import { useNotifications } from '@/lib/hooks/useNotifications'
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const currentUser = useCurrentUser()
-  const { unreadCount } = useNotifications()
 
   const NAV_ITEMS = [
-    { href: '/home',          icon: Home,        label: 'Inicio'        },
-    { href: '/market',        icon: ShoppingBag, label: 'Market'        },
-    { href: '/explore',       icon: Compass,     label: 'Explorar'      },
-    { href: '/notifications', icon: Bell,        label: 'Notificaciones', badge: unreadCount },
-    { href: '/purchases',      icon: BookMarked,  label: 'Mis compras'   },
+    { href: '/home',      icon: Home,        label: 'Inicio'      },
+    { href: '/market',    icon: ShoppingBag, label: 'Market'      },
+    { href: '/explore',   icon: Compass,     label: 'Explorar'    },
+    { href: '/purchases', icon: BookMarked,  label: 'Mis compras' },
     { href: currentUser ? `/${currentUser.username}` : '#', icon: User, label: 'Perfil' },
   ]
 
@@ -45,7 +42,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 flex flex-col gap-0.5 mt-1">
-        {NAV_ITEMS.map(({ href, icon: Icon, label, badge }) => {
+        {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href
           return (
             <Link key={href} href={href}
@@ -59,12 +56,6 @@ export default function Sidebar() {
               )}
               <Icon size={19} className={isActive ? 'text-[#FF1A8C]' : 'group-hover:text-[#FF1A8C] transition-colors'} />
               <span className={`text-sm font-medium ${isActive ? 'font-semibold' : ''}`}>{label}</span>
-              {badge && (
-                <span className="ml-auto text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg, #8B3FFF, #FF1A8C)' }}>
-                  {badge}
-                </span>
-              )}
             </Link>
           )
         })}

@@ -1,5 +1,6 @@
 import Sidebar from '@/components/layout/Sidebar'
 import BottomNav from '@/components/layout/BottomNav'
+import TopBar from '@/components/layout/TopBar'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,10 +14,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {/* Sidebar — desktop only */}
       <Sidebar />
 
-      {/* Main content — extra bottom padding on mobile for bottom nav */}
-      <main className="flex-1 min-w-0 relative z-10 pb-24 md:pb-0">
-        {children}
-      </main>
+      {/* Right column: TopBar + content */}
+      <div className="flex-1 min-w-0 flex flex-col relative z-10">
+        <TopBar />
+        <main className="flex-1 pb-24 md:pb-0">
+          {children}
+        </main>
+      </div>
 
       {/* Bottom nav — mobile only */}
       <BottomNav />
