@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -16,7 +16,7 @@ const ROLES = [
   { id: 'educator', label: 'Educador', emoji: '📚' },
 ]
 
-export default function SignupPage() {
+function SignupContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const next         = searchParams.get('next') || ''
@@ -143,5 +143,13 @@ export default function SignupPage() {
           className="text-[#e91e8c] font-medium hover:underline">Iniciar sesión</Link>
       </p>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupContent />
+    </Suspense>
   )
 }
