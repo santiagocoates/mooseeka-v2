@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, Plus, Trash2, Loader2, GripVertical } from 'lucide-react'
+import CoverUpload from '@/components/shared/CoverUpload'
 
 interface ItemForm {
   id?: string          // existe si ya estaba guardado
@@ -211,21 +212,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
-        {/* Cover URL */}
+        {/* Cover image upload */}
         <div>
-          <label className="block text-sm font-semibold text-white mb-2">URL de portada (imagen)</label>
-          <input value={coverUrl} onChange={e => setCoverUrl(e.target.value)}
-            placeholder="https://... (URL de imagen pública)"
-            className="w-full text-white placeholder-[#7A6890] px-4 py-3 rounded-xl text-sm focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(123,47,255,0.25)' }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.55)')}
-            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.25)')} />
-          {coverUrl && (
-            <div className="mt-2 w-32 h-20 rounded-xl overflow-hidden">
-              <img src={coverUrl} alt="preview" className="w-full h-full object-cover"
-                onError={e => (e.currentTarget.style.display = 'none')} />
-            </div>
-          )}
+          <label className="block text-sm font-semibold text-white mb-2">Imagen de portada</label>
+          <CoverUpload value={coverUrl} onChange={setCoverUrl} />
         </div>
 
         <div className="h-px" style={{ background: 'rgba(123,47,255,0.15)' }} />
