@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     // Verificar que el producto existe y está publicado
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, title, price_usd, cover_url, published')
+      .select('id, slug, title, price_usd, cover_url, published')
       .eq('id', productId)
       .eq('published', true)
       .single()
@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
         productId: product.id,
         buyerId: user.id,
       },
-      success_url: `${baseUrl}/products/${product.id}?success=true`,
-      cancel_url: `${baseUrl}/products/${product.id}`,
+      success_url: `${baseUrl}/products/${product.slug || product.id}?success=true`,
+      cancel_url: `${baseUrl}/products/${product.slug || product.id}`,
     })
 
     return NextResponse.json({ url: session.url })

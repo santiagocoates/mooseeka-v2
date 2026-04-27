@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, ArrowRight, Check, Upload, X, Plus, Star, Clock, RefreshCw, Music } from 'lucide-react'
 import Link from 'next/link'
 
@@ -27,6 +28,8 @@ interface FormData {
   // Step 3
   coverPreview: string | null
   audioPreview: string | null
+  coverFile: File | null
+  audioFile: File | null
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -479,15 +482,15 @@ function StepPrecio({ data, onChange, onIncludesChange }: {
 }
 
 // ─── Step 3: Portada ──────────────────────────────────────────────────────────
-function StepPortada({ data, onChange }: { data: FormData; onChange: (k: keyof FormData, v: string | null) => void }) {
+function StepPortada({ data, onChange }: { data: FormData; onChange: (k: keyof FormData, v: string | File | null) => void }) {
   const coverRef  = useRef<HTMLInputElement>(null)
   const audioRef  = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
   function handleCoverFile(file: File | undefined) {
     if (!file || !file.type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    onChange('coverPreview', url)
+    onChange('coverFile', file)
+    onChange('coverPreview', URL.createObjectURL(file))
   }
 
   return (
@@ -555,6 +558,7 @@ function StepPortada({ data, onChange }: { data: FormData; onChange: (k: keyof F
           onChange={e => {
             const f = e.target.files?.[0]
             if (!f) return
+            onChange('audioFile', f)
             onChange('audioPreview', f.name)
           }} />
 
@@ -584,7 +588,9 @@ function StepPortada({ data, onChange }: { data: FormData; onChange: (k: keyof F
 }
 
 // ─── Step 4: Vista previa ─────────────────────────────────────────────────────
-function StepPreview({ data, onPublish }: { data: FormData; onPublish: () => void }) {
+function StepPreview({ data, onPublish, publishing = false, publishError = null }: {
+  data: FormData; onPublish: () => void; publishing?: boolean; publishError?: string | null
+}) {
   const category = (data.type === 'service' ? SERVICE_CATEGORIES : PRODUCT_CATEGORIES)
     .find(c => c.value === data.category)
 
@@ -690,10 +696,14 @@ function StepPreview({ data, onPublish }: { data: FormData; onPublish: () => voi
       {/* Publish */}
       <div className="flex flex-col gap-3">
         <button onClick={onPublish}
-          className="w-full py-4 rounded-2xl text-white font-black text-base tracking-tight transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]"
+          disabled={publishing}
+          className="w-full py-4 rounded-2xl text-white font-black text-base tracking-tight transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
           style={{ background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)' }}>
-          🚀 Publicar en Mooseeka
+          {publishing ? '⏳ Publicando...' : '🚀 Publicar en Mooseeka'}
         </button>
+        {publishError && (
+          <p className="text-xs text-center" style={{ color: '#EF4444' }}>{publishError}</p>
+        )}
         <button className="text-sm text-center transition-colors hover:opacity-80" style={{ color: '#7A6890' }}>
           Guardar como borrador
         </button>
@@ -709,15 +719,17 @@ const INITIAL: FormData = {
   pricingModel: 'proyecto', price: '', currency: '€',
   deliveryTime: '', revisions: '2', includes: [],
   licenseType: '', fileFormat: '',
-  coverPreview: null, audioPreview: null,
+  coverPreview: null, audioPreview: null, coverFile: null, audioFile: null,
 }
 
 export default function NewServicePage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [data, setData] = useState<FormData>(INITIAL)
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
 
-  function setField(k: keyof FormData, v: string | string[] | null) {
+  function setField(k: keyof FormData, v: string | string[] | File | null) {
     setData(prev => ({ ...prev, [k]: v }))
   }
 
@@ -735,9 +747,69 @@ export default function NewServicePage() {
     return true
   }
 
-  function handlePublish() {
-    // TODO: save to Supabase
-    router.push('/elenarios')
+  async function handlePublish() {
+    setPublishing(true)
+    setPublishError(null)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { router.push('/login'); return }
+
+      let coverUrl: string | null = null
+      let audioUrl: string | null = null
+
+      if (data.coverFile) {
+        const ext = data.coverFile.name.split('.').pop() ?? 'jpg'
+        const path = `${session.user.id}/${Date.now()}_cover.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('services')
+          .upload(path, data.coverFile, { upsert: true })
+        if (!upErr) {
+          coverUrl = supabase.storage.from('services').getPublicUrl(path).data.publicUrl
+        }
+      }
+
+      if (data.audioFile) {
+        const ext = data.audioFile.name.split('.').pop() ?? 'mp3'
+        const path = `${session.user.id}/${Date.now()}_audio.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('services')
+          .upload(path, data.audioFile, { upsert: true })
+        if (!upErr) {
+          audioUrl = supabase.storage.from('services').getPublicUrl(path).data.publicUrl
+        }
+      }
+
+      const deliveryDaysMap: Record<string, number> = { '24h': 1, '3d': 3, '1w': 7, '2w': 14 }
+      const currencyMap: Record<string, string> = { '€': 'EUR', '$': 'USD', 'USD': 'USD' }
+
+      const { data: newService, error } = await supabase
+        .from('services')
+        .insert({
+          seller_id: session.user.id,
+          type: data.type === 'service' ? 'service' : 'digital_product',
+          title: data.title.trim(),
+          description: data.description.trim() || null,
+          category: data.category || null,
+          price: data.pricingModel === 'consultar' ? 0 : parseFloat(data.price) || 0,
+          currency: currencyMap[data.currency] ?? 'EUR',
+          delivery_days: deliveryDaysMap[data.deliveryTime] ?? null,
+          revisions: data.revisions === 'Ilimitadas' ? 99 : parseInt(data.revisions) || 2,
+          includes: data.includes,
+          cover_url: coverUrl,
+          audio_url: audioUrl,
+          is_active: true,
+        })
+        .select('id')
+        .single()
+
+      if (error) throw error
+      router.push(`/services/${newService.id}`)
+    } catch {
+      setPublishError('Error al publicar. Por favor intenta de nuevo.')
+    } finally {
+      setPublishing(false)
+    }
   }
 
   return (
@@ -776,7 +848,7 @@ export default function NewServicePage() {
             />
           )}
           {step === 3 && <StepPortada data={data} onChange={(k, v) => setField(k, v)} />}
-          {step === 4 && <StepPreview data={data} onPublish={handlePublish} />}
+          {step === 4 && <StepPreview data={data} onPublish={handlePublish} publishing={publishing} publishError={publishError} />}
         </div>
 
         {/* Nav buttons */}

@@ -105,6 +105,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           type,
           price_usd:   parseFloat(price),
           cover_url:   coverUrl.trim() || null,
+          slug:        title.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || null,
           published,
         })
         .eq('id', id)

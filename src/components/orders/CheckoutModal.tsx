@@ -3,11 +3,15 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, ArrowLeft, ArrowRight, Shield, Clock, RefreshCw, Upload, Music, Check } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface ServiceInfo {
   id: string
+  sellerId: string
   title: string
   price: string
+  numericPrice: number
+  rawCurrency: string
   pricingModel: string
   deliveryTime: string
   revisions: string
@@ -36,13 +40,35 @@ export default function CheckoutModal({ open, onClose, service }: CheckoutModalP
 
   function handleClose() { reset(); onClose() }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     setLoading(true)
-    // TODO: create order in Supabase + Stripe Checkout
-    setTimeout(() => {
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { router.push('/login'); return }
+
+      const { data: newOrder, error } = await supabase
+        .from('orders')
+        .insert({
+          buyer_id: session.user.id,
+          seller_id: service.sellerId,
+          service_id: service.id,
+          status: 'pending',
+          project_name: projectName.trim(),
+          notes: notes.trim() || null,
+          deadline: deadline || null,
+          price: service.numericPrice,
+          currency: service.rawCurrency,
+        })
+        .select('id')
+        .single()
+
+      if (error) throw error
       handleClose()
-      router.push('/orders/ord_001')
-    }, 1200)
+      router.push(`/orders/${newOrder.id}`)
+    } catch {
+      setLoading(false)
+    }
   }
 
   const canContinue = projectName.trim().length >= 2

@@ -33,6 +33,13 @@ export default function NewProductPage() {
   const [coverUrl,    setCoverUrl]    = useState('')
   const [published,   setPublished]   = useState(false)
 
+  function toSlug(text: string) {
+    return text.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '').trim()
+      .replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 60)
+  }
+
   // Items (clases/archivos)
   const [items,  setItems]  = useState<ItemForm[]>([])
   const [saving, setSaving] = useState(false)
@@ -74,6 +81,7 @@ export default function NewProductPage() {
           type,
           price_usd:   parseFloat(price),
           cover_url:   coverUrl.trim() || null,
+          slug:        toSlug(title.trim()) || null,
           published,
         })
         .select('id')

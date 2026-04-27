@@ -9,6 +9,7 @@ import { ShoppingCart, Play, Lock, CheckCircle, ChevronLeft, Loader2, BookOpen, 
 
 interface Product {
   id: string
+  slug: string | null
   title: string
   description: string | null
   price_usd: number
@@ -53,12 +54,14 @@ function formatDuration(secs: number | null) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default function ProductPage() {
   const params       = useParams()
   const searchParams = useSearchParams()
   const router       = useRouter()
   const currentUser  = useCurrentUser()
-  const id           = params.id as string
+  const slug         = params.slug as string
 
   const [product,   setProduct]   = useState<Product | null>(null)
   const [items,     setItems]     = useState<ProductItem[]>([])
@@ -72,12 +75,14 @@ export default function ProductPage() {
     async function load() {
       const supabase = createClient()
 
-      const { data: prod } = await supabase
+      // Soportar tanto slug legible como UUID (links viejos)
+      const isUUID = UUID_RE.test(slug)
+      const query  = supabase
         .from('products')
         .select('*, profile:profiles!products_seller_id_fkey(name, username, avatar_url)')
-        .eq('id', id)
         .eq('published', true)
-        .single()
+
+      const { data: prod } = await (isUUID ? query.eq('id', slug) : query.eq('slug', slug)).single()
 
       if (!prod) { setLoading(false); return }
       setProduct(prod as Product)
@@ -85,7 +90,7 @@ export default function ProductPage() {
       const { data: its } = await supabase
         .from('product_items')
         .select('*')
-        .eq('product_id', id)
+        .eq('product_id', prod.id)
         .order('order_index')
 
       setItems((its ?? []) as ProductItem[])
@@ -96,7 +101,7 @@ export default function ProductPage() {
         const { data: purchase } = await supabase
           .from('purchases')
           .select('id')
-          .eq('product_id', id)
+          .eq('product_id', prod.id)
           .eq('buyer_id', session.user.id)
           .eq('status', 'completed')
           .maybeSingle()
@@ -106,11 +111,11 @@ export default function ProductPage() {
       setLoading(false)
     }
     load()
-  }, [id, currentUser?.id])
+  }, [slug, currentUser?.id])
 
   // Si viene de success y no se registró aún, refetch cada 2s hasta que aparezca
   useEffect(() => {
-    if (!success || purchased) return
+    if (!success || purchased || !product) return
     const interval = setInterval(async () => {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
@@ -118,14 +123,14 @@ export default function ProductPage() {
       const { data } = await supabase
         .from('purchases')
         .select('id')
-        .eq('product_id', id)
+        .eq('product_id', product.id)
         .eq('buyer_id', session.user.id)
         .eq('status', 'completed')
         .maybeSingle()
       if (data) { setPurchased(true); clearInterval(interval) }
     }, 2000)
     return () => clearInterval(interval)
-  }, [success, purchased, id])
+  }, [success, purchased, product])
 
   // Auto-trigger checkout si viene de login con ?buy=1
   useEffect(() => {
@@ -141,7 +146,7 @@ export default function ProductPage() {
 
   async function handleBuy() {
     if (!currentUser) {
-      router.push(`/login?next=${encodeURIComponent(`/products/${id}?buy=1`)}`)
+      router.push(`/login?next=${encodeURIComponent(`/products/${slug}?buy=1`)}`)
       return
     }
     setBuying(true)
@@ -149,7 +154,7 @@ export default function ProductPage() {
       const res  = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: id }),
+        body: JSON.stringify({ productId: product?.id }),
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
@@ -257,7 +262,7 @@ export default function ProductPage() {
             </p>
 
             {purchased ? (
-              <Link href={`/products/${id}/watch`}
+              <Link href={`/products/${product?.slug || product?.id}/watch`}
                 className="flex items-center gap-2 px-6 py-3 rounded-full text-white font-bold text-sm transition-all hover:opacity-90 gradient-magenta glow-btn">
                 <Play size={16} fill="white" />
                 Ver {product.type === 'course' ? 'curso' : 'contenido'}

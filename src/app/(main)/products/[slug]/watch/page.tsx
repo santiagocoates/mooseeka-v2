@@ -18,6 +18,7 @@ interface ProductItem {
 
 interface Product {
   id: string
+  slug: string | null
   title: string
   type: string
 }
@@ -40,10 +41,12 @@ function getEmbedUrl(url: string): string {
   return url
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default function WatchPage() {
   const params  = useParams()
   const router  = useRouter()
-  const id      = params.id as string
+  const slug    = params.slug as string
 
   const [product,  setProduct]  = useState<Product | null>(null)
   const [items,    setItems]    = useState<ProductItem[]>([])
@@ -56,33 +59,37 @@ export default function WatchPage() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
 
-      if (!session?.user?.id) { router.replace(`/products/${id}`); return }
+      if (!session?.user?.id) { router.replace(`/products/${slug}`); return }
+
+      // Resolver producto por slug o UUID
+      const isUUID = UUID_RE.test(slug)
+      const q = supabase.from('products').select('id, title, type, slug')
+      const { data: prod } = await (isUUID ? q.eq('id', slug) : q.eq('slug', slug)).single()
+
+      if (!prod) { router.replace(`/products/${slug}`); return }
 
       // Verificar compra
       const { data: purchase } = await supabase
         .from('purchases')
         .select('id')
-        .eq('product_id', id)
+        .eq('product_id', prod.id)
         .eq('buyer_id', session.user.id)
         .eq('status', 'completed')
         .maybeSingle()
 
       if (!purchase) { setDenied(true); setLoading(false); return }
 
-      // Cargar producto e items
-      const [prodRes, itemsRes] = await Promise.all([
-        supabase.from('products').select('id, title, type').eq('id', id).single(),
-        supabase.from('product_items').select('*').eq('product_id', id).order('order_index'),
-      ])
+      const { data: its } = await supabase
+        .from('product_items').select('*').eq('product_id', prod.id).order('order_index')
 
-      if (prodRes.data) setProduct(prodRes.data as Product)
-      const its = (itemsRes.data ?? []) as ProductItem[]
-      setItems(its)
-      if (its.length > 0) setCurrent(its[0])
+      setProduct(prod as Product)
+      const itemsList = (its ?? []) as ProductItem[]
+      setItems(itemsList)
+      if (itemsList.length > 0) setCurrent(itemsList[0])
       setLoading(false)
     }
     load()
-  }, [id, router])
+  }, [slug, router])
 
   if (loading) {
     return (
@@ -100,7 +107,7 @@ export default function WatchPage() {
         <p className="text-sm mb-6" style={{ color: '#C0A8D8' }}>
           Necesitás comprar este producto para ver el contenido.
         </p>
-        <Link href={`/products/${id}`}
+        <Link href={`/products/${product?.slug || slug}`}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-white font-bold gradient-magenta glow-btn hover:opacity-90 transition-all">
           Ver producto
         </Link>
@@ -114,7 +121,7 @@ export default function WatchPage() {
       <aside className="lg:w-72 shrink-0 order-2 lg:order-1"
         style={{ background: 'rgba(14,0,32,0.95)', borderRight: '1px solid rgba(123,47,255,0.15)' }}>
         <div className="p-4 border-b" style={{ borderColor: 'rgba(123,47,255,0.15)' }}>
-          <Link href={`/products/${id}`}
+          <Link href={`/products/${product?.slug || slug}`}
             className="inline-flex items-center gap-1.5 text-xs mb-3 transition-opacity hover:opacity-70"
             style={{ color: '#C0A8D8' }}>
             <ChevronLeft size={14} /> Volver

@@ -8,6 +8,7 @@ import { BookOpen, Music, Package, Loader2 } from 'lucide-react'
 
 interface Product {
   id: string
+  slug: string | null
   title: string
   type: string
   price_usd: number
@@ -53,7 +54,7 @@ export default function MarketPage() {
       const { data } = await supabase
         .from('products')
         .select(`
-          id, title, type, price_usd, cover_url,
+          id, slug, title, type, price_usd, cover_url,
           profile:profiles!products_seller_id_fkey(name, username, avatar_url)
         `)
         .eq('published', true)
@@ -145,7 +146,7 @@ export default function MarketPage() {
       {!loading && filtered.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(product => (
-            <Link key={product.id} href={`/products/${product.id}`}
+            <Link key={product.id} href={`/products/${product.slug || product.id}`}
               className="rounded-2xl overflow-hidden transition-all hover:scale-[1.02] hover:shadow-lg group"
               style={{ background: 'rgba(25,0,50,0.7)', border: '1px solid rgba(123,47,255,0.2)' }}>
 
