@@ -35,6 +35,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=auth`)
   }
 
+  // Leer parámetro next (para volver al producto después del login/signup)
+  const next = searchParams.get('next')
+  const safeNext = next && next.startsWith('/') ? next : null
+
   // Check if user needs onboarding
   const { data: profile } = await supabase
     .from('profiles')
@@ -43,7 +47,16 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
 
   const needsOnboarding = !profile || !profile.onboarding_completed
-  const response = NextResponse.redirect(`${origin}${needsOnboarding ? '/onboarding' : '/home'}`)
+  let destination: string
+
+  if (safeNext) {
+    // Si viene de un producto, ignorar onboarding y llevar directo al destino
+    destination = safeNext
+  } else {
+    destination = needsOnboarding ? '/onboarding' : '/home'
+  }
+
+  const response = NextResponse.redirect(`${origin}${destination}`)
 
   // Apply session cookies directly to the redirect response
   newCookies.forEach(({ name, value, options }) => {

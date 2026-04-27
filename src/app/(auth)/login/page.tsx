@@ -3,11 +3,14 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const next         = searchParams.get('next') || '/home'
+
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,7 +21,7 @@ export default function LoginPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/home` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
     })
   }
 
@@ -28,7 +31,7 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { alert(error.message); setLoading(false) }
-    else router.push('/home')
+    else router.push(next)
   }
 
   return (
@@ -118,7 +121,8 @@ export default function LoginPage() {
 
         <p className="text-sm" style={{ color: '#7A6890' }}>
           ¿No tienes cuenta?{' '}
-          <Link href="/signup" className="font-semibold hover:underline" style={{ color: '#FF1A8C' }}>Regístrate</Link>
+          <Link href={`/signup${next !== '/home' ? `?next=${encodeURIComponent(next)}` : ''}`}
+            className="font-semibold hover:underline" style={{ color: '#FF1A8C' }}>Regístrate</Link>
         </p>
       </div>
     </>

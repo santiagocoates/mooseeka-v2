@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const ROLES = [
@@ -17,7 +17,12 @@ const ROLES = [
 ]
 
 export default function SignupPage() {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const next         = searchParams.get('next') || ''
+  // Si viene de un producto, saltamos el paso de roles y vamos directo al checkout
+  const isBuyerFlow  = next.includes('/products/')
+
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
@@ -36,25 +41,27 @@ export default function SignupPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/home` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next || '/home')}` },
     })
   }
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
-    if (step === 1) { setStep(2); return }
+    // Si no es flujo de compra, mostrar paso 2 (roles)
+    if (step === 1 && !isBuyerFlow) { setStep(2); return }
     setLoading(true)
     const supabase = createClient()
+    const afterSignup = next || '/onboarding'
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { name, roles: selectedRoles },
-        emailRedirectTo: `${window.location.origin}/onboarding`,
+        emailRedirectTo: `${window.location.origin}${afterSignup}`,
       },
     })
     if (error) { alert(error.message); setLoading(false) }
-    else { router.push('/onboarding') }
+    else { router.push(afterSignup) }
   }
 
   return (
@@ -100,7 +107,7 @@ export default function SignupPage() {
             <input type="password" placeholder="Contraseña (mín. 8 caracteres)" value={password} onChange={e => setPassword(e.target.value)} required minLength={8}
               className="w-full bg-[#2a1a4e] border border-white/10 text-white placeholder-[#b0b0b0] px-4 py-3 rounded-xl focus:outline-none focus:border-[#8b5cf6] transition-colors" />
             <button type="submit" className="w-full gradient-magenta text-white font-semibold py-4 rounded-full hover:opacity-90 transition-all">
-              Continuar →
+              {isBuyerFlow ? 'Crear cuenta y comprar →' : 'Continuar →'}
             </button>
           </form>
         </div>
@@ -132,7 +139,8 @@ export default function SignupPage() {
 
       <p className="text-[#b0b0b0] text-sm">
         ¿Ya tienes cuenta?{' '}
-        <Link href="/login" className="text-[#e91e8c] font-medium hover:underline">Iniciar sesión</Link>
+        <Link href={`/login${next ? `?next=${encodeURIComponent(next)}` : ''}`}
+          className="text-[#e91e8c] font-medium hover:underline">Iniciar sesión</Link>
       </p>
     </div>
   )

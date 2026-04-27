@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -66,6 +66,7 @@ export default function ProductPage() {
   const [loading,   setLoading]   = useState(true)
   const [buying,    setBuying]    = useState(false)
   const [success,   setSuccess]   = useState(searchParams.get('success') === 'true')
+  const autoBuyFired              = useRef(false)
 
   useEffect(() => {
     async function load() {
@@ -126,8 +127,23 @@ export default function ProductPage() {
     return () => clearInterval(interval)
   }, [success, purchased, id])
 
+  // Auto-trigger checkout si viene de login con ?buy=1
+  useEffect(() => {
+    if (
+      searchParams.get('buy') === '1' &&
+      !loading && currentUser && !purchased && !buying && !autoBuyFired.current
+    ) {
+      autoBuyFired.current = true
+      handleBuy()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, currentUser, purchased])
+
   async function handleBuy() {
-    if (!currentUser) { router.push('/login'); return }
+    if (!currentUser) {
+      router.push(`/login?next=${encodeURIComponent(`/products/${id}?buy=1`)}`)
+      return
+    }
     setBuying(true)
     try {
       const res  = await fetch('/api/checkout', {
