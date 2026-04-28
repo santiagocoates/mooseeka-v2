@@ -421,7 +421,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
               onFocus={() => setInlineOpen(true)}
               placeholder="Comparte un lanzamiento, logro, video o búsqueda..."
               rows={inlineOpen ? 4 : 2}
-              className="flex-1 bg-transparent text-white placeholder-[#7A6890] resize-none focus:outline-none text-sm leading-relaxed transition-all"
+              className="flex-1 min-w-0 bg-transparent text-white placeholder-[#7A6890] resize-none focus:outline-none text-sm leading-relaxed transition-all"
               style={{ minHeight: inlineOpen ? '96px' : '44px' }}
             />
           </div>

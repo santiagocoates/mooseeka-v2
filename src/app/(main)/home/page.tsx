@@ -178,8 +178,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <div className="flex-1 max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
+    <div className="w-full max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
         <CreatePost onPost={handleNewPost} />
 
         {/* Trending — solo si hay perfiles */}
@@ -282,7 +281,6 @@ export default function HomePage() {
             onDelete={handleDelete}
           />
         ))}
-      </div>
     </div>
   )
 }
