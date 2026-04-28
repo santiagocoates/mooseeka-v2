@@ -32,6 +32,12 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data.user) {
+    // El código puede haber sido ya usado (refresh / doble redirect).
+    // Si hay sesión activa, mandamos al home en vez de mostrar error.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      return NextResponse.redirect(`${origin}/home`)
+    }
     return NextResponse.redirect(`${origin}/login?error=auth`)
   }
 

@@ -11,6 +11,8 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const next         = searchParams.get('next') || '/home'
 
+  const hasAuthError = searchParams.get('error') === 'auth'
+
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -55,6 +57,14 @@ function LoginContent() {
             </p>
           </div>
         </div>
+
+        {/* Auth error banner */}
+        {hasAuthError && (
+          <div className="w-full px-4 py-3 rounded-xl text-sm text-center"
+            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
+            Hubo un problema al iniciar sesión. Por favor intentá de nuevo.
+          </div>
+        )}
 
         {/* Auth */}
         {mode === 'google' ? (
