@@ -24,7 +24,8 @@ export default function OnboardingListo() {
     async function save() {
       try {
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
         if (!user) { setError('No hay sesión activa.'); setSaving(false); return }
 
         let avatar_url: string | undefined
