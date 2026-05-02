@@ -151,7 +151,7 @@ export default function ProductPage() {
     }
     setBuying(true)
     try {
-      const res  = await fetch('/api/checkout', {
+      const res  = await fetch('/api/mp-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId: product?.id }),
