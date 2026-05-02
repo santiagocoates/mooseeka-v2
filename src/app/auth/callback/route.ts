@@ -48,11 +48,12 @@ export async function GET(request: NextRequest) {
   // Check if user needs onboarding
   const { data: profile } = await supabase
     .from('profiles')
-    .select('onboarding_completed')
+    .select('onboarding_completed, username')
     .eq('id', data.user.id)
     .maybeSingle()
 
-  const needsOnboarding = !profile || !profile.onboarding_completed
+  // Needs onboarding if: no profile, onboarding not completed, or no username set
+  const needsOnboarding = !profile || !profile.onboarding_completed || !profile.username
   let destination: string
 
   if (safeNext) {

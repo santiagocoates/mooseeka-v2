@@ -159,7 +159,7 @@ export default function HomePage() {
       .eq('onboarding_completed', true)
       .order('created_at', { ascending: false })
       .limit(4)
-    if (data) setTrending(data.map(p => ({ ...p, follower_count: 0 })))
+    if (data) setTrending(data.filter(p => p.username).map(p => ({ ...p, follower_count: 0 })))
   }, [])
 
   useEffect(() => {
