@@ -56,11 +56,12 @@ export async function GET(request: NextRequest) {
   const needsOnboarding = !profile || !profile.onboarding_completed || !profile.username
   let destination: string
 
-  if (safeNext) {
-    // Si viene de un producto, ignorar onboarding y llevar directo al destino
-    destination = safeNext
+  if (needsOnboarding) {
+    // Onboarding siempre tiene prioridad — sin perfil no hay app
+    destination = '/onboarding'
   } else {
-    destination = needsOnboarding ? '/onboarding' : '/home'
+    // Usuario ya completó onboarding: respetar destino original o ir al home
+    destination = safeNext ?? '/home'
   }
 
   const response = NextResponse.redirect(`${origin}${destination}`)
