@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
             title: product.title,
             quantity: 1,
             unit_price: Number(product.price_usd),
-            currency_id: 'USD',
+            currency_id: 'ARS',
           },
         ],
         metadata: {
@@ -62,9 +62,15 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    if (!result.init_point) {
+      console.error('[mp-checkout] no init_point in result:', result)
+      return NextResponse.json({ error: 'MP no devolvió URL de pago' }, { status: 500 })
+    }
+
     return NextResponse.json({ url: result.init_point })
-  } catch (err) {
-    console.error('[mp-checkout] error:', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : JSON.stringify(err)
+    console.error('[mp-checkout] error:', msg)
+    return NextResponse.json({ error: `Error interno: ${msg}` }, { status: 500 })
   }
 }
