@@ -257,8 +257,8 @@ export default function ProductPage() {
           {/* Price + CTA */}
           <div className="flex items-center justify-between">
             <p className="text-3xl font-black text-white">
-              ${Number(product.price_usd).toFixed(0)}
-              <span className="text-base font-medium ml-1" style={{ color: '#7A6890' }}>USD</span>
+              ${Number(product.price_usd).toLocaleString('es-AR')}
+              <span className="text-base font-medium ml-1" style={{ color: '#7A6890' }}>ARS</span>
             </p>
 
             {purchased ? (
@@ -274,7 +274,7 @@ export default function ProductPage() {
                   ? <Loader2 size={16} className="animate-spin" />
                   : <ShoppingCart size={16} />
                 }
-                {buying ? 'Procesando...' : `Comprar $${Number(product.price_usd).toFixed(0)}`}
+                {buying ? 'Procesando...' : `Comprar $${Number(product.price_usd).toLocaleString('es-AR')}`}
               </button>
             )}
           </div>

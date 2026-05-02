@@ -187,8 +187,8 @@ export default function MarketPage() {
                 </div>
 
                 <p className="text-white font-black text-base">
-                  ${Number(product.price_usd).toFixed(0)}
-                  <span className="text-xs font-medium ml-1" style={{ color: '#7A6890' }}>USD</span>
+                  ${Number(product.price_usd).toLocaleString('es-AR')}
+                  <span className="text-xs font-medium ml-1" style={{ color: '#7A6890' }}>ARS</span>
                 </p>
               </div>
             </Link>
