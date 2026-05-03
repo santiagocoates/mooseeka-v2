@@ -14,6 +14,10 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
+  icons: {
+    icon: '/isologo.png',
+    apple: '/isologo.png',
+  },
   title: "Mooseeka - La red profesional de la música",
   description: "Plataforma para que profesionales de la industria musical puedan conectar, vender servicios y mostrar sus trabajos.",
   openGraph: {
