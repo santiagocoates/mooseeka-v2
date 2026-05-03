@@ -337,28 +337,12 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               </div>
             )}
 
-            {/* Services */}
-            {(services.length > 0 || isOwner) && (
+            {/* Services — TODO: re-enable "+ Agregar" button and empty state when services are open to all users */}
+            {services.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-white font-bold">Servicios</h3>
-                  {isOwner && (
-                    <Link href="/services/new"
-                      className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full hover:opacity-80 transition-all"
-                      style={{ background: 'linear-gradient(135deg,#8B3FFF,#FF1A8C)', color: '#fff' }}>
-                      + Agregar
-                    </Link>
-                  )}
                 </div>
-                {services.length === 0 && isOwner && (
-                  <div className="rounded-xl p-6 flex flex-col items-center gap-2 text-center"
-                    style={{ background: 'rgba(25,0,50,0.6)', border: '1px dashed rgba(123,47,255,0.25)' }}>
-                    <p className="text-sm" style={{ color: '#7A6890' }}>Aún no tienes servicios publicados.</p>
-                    <Link href="/services/new" className="text-sm font-semibold" style={{ color: '#A855F7' }}>
-                      Publicar mi primer servicio →
-                    </Link>
-                  </div>
-                )}
                 <div className="flex flex-col gap-2">
                   {services.map(service => (
                     <Link key={service.id} href={`/services/${service.id}`}
