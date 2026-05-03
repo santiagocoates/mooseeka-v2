@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Heart, MessageCircle, Share2, MoreHorizontal, Play, Pause, Trash2, Link2, Check, Send, Loader2 } from 'lucide-react'
+import LinkPreview from '@/components/shared/LinkPreview'
 import { createClient } from '@/lib/supabase/client'
 import { createNotification } from '@/lib/notifications'
 
@@ -420,18 +421,9 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
         </div>
       )}
 
-      {/* Plain link */}
+      {/* Link — rich OG preview */}
       {post.embed?.type === 'link' && (
-        <a href={post.embed.url} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-3 p-3 mt-3 rounded-xl hover:bg-white/5 transition-colors"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(123,47,255,0.2)' }}>
-          <img src={`https://www.google.com/s2/favicons?domain=${getDomain(post.embed.url)}&sz=32`}
-            alt="" className="w-6 h-6 rounded shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate" style={{ color: '#C0A8D8' }}>{getDomain(post.embed.url)}</p>
-            <p className="text-xs truncate mt-0.5" style={{ color: '#7A6890' }}>{post.embed.url}</p>
-          </div>
-        </a>
+        <LinkPreview url={post.embed.url} />
       )}
 
       {/* Actions */}

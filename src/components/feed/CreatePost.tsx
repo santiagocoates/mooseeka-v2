@@ -3,9 +3,10 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   X, ChevronRight, ArrowLeft, Play,
-  Upload, FileAudio, ExternalLink, Trash2,
+  Upload, FileAudio, Trash2,
   ImageIcon, Music, Video, Send, Link2
 } from 'lucide-react'
+import LinkPreview from '@/components/shared/LinkPreview'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { PostData } from './PostCard'
@@ -124,17 +125,9 @@ function MediaPreview({ media, onRemove }: { media: MediaState; onRemove: () => 
         <img src={media.imageUrl} alt="preview" className="w-full max-h-64 object-cover" />
       )}
       {media.type === 'link' && (
-        <a href={media.url} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors"
-          style={{ background: 'rgba(255,255,255,0.04)' }}>
-          <img src={`https://www.google.com/s2/favicons?domain=${getDomain(media.url)}&sz=32`}
-            alt="" className="w-6 h-6 rounded shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate" style={{ color: '#C0A8D8' }}>{getDomain(media.url)}</p>
-            <p className="text-xs truncate mt-0.5" style={{ color: '#7A6890' }}>{media.url}</p>
-          </div>
-          <ExternalLink size={13} style={{ color: '#7A6890' }} />
-        </a>
+        <div className="p-2">
+          <LinkPreview url={media.url} />
+        </div>
       )}
     </div>
   )
