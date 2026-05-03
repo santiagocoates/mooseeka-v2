@@ -239,7 +239,8 @@ export default function CreatePost({ onPost }: CreatePostProps) {
       }
     }
     setInlineText(text)
-    if (inlineMedia.autoDetected) setInlineMedia({ type: null, url: '' })
+    // No borrar media auto-detectado: el URL ya fue extraído del texto,
+    // el usuario puede seguir escribiendo sin perder el link
   }
 
   function handleModalTextChange(text: string) {
@@ -253,7 +254,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
       }
     }
     setContent(text)
-    if (media.autoDetected) setMedia({ type: null, url: '' })
+    // No borrar media auto-detectado al seguir escribiendo
   }
 
   function handleInlineImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -361,7 +362,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
   }
 
   async function handleInlinePublish() {
-    if (!inlineText.trim() || publishing) return
+    if ((!inlineText.trim() && !inlineMedia.type) || publishing) return
     setPublishing(true); setError(null)
     try {
       const post = await publishPost(inlineType, inlineText, inlineMedia)
@@ -375,7 +376,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
   }
 
   async function handleModalPublish() {
-    if (!content.trim() || !selectedType || modalPublishing) return
+    if ((!content.trim() && !media.type) || !selectedType || modalPublishing) return
     setModalPublishing(true); setModalError(null)
     try {
       const post = await publishPost(selectedType, content, media)
@@ -479,7 +480,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
                 Cancelar
               </button>
               <button
-                disabled={!inlineText.trim() || publishing}
+                disabled={(!inlineText.trim() && !inlineMedia.type) || publishing}
                 onClick={handleInlinePublish}
                 className="flex items-center gap-2 text-white font-bold px-5 py-1.5 rounded-full text-sm gradient-magenta glow-btn hover:opacity-90 transition-all disabled:opacity-30">
                 <Send size={14} />
@@ -635,7 +636,7 @@ export default function CreatePost({ onPost }: CreatePostProps) {
                   style={{ color: '#7A6890' }}>
                   Cancelar
                 </button>
-                <button disabled={!content.trim() || modalPublishing} onClick={handleModalPublish}
+                <button disabled={(!content.trim() && !media.type) || modalPublishing} onClick={handleModalPublish}
                   className="flex items-center gap-2 text-white font-bold px-6 py-2.5 rounded-full text-sm gradient-magenta glow-btn hover:opacity-90 transition-all disabled:opacity-30">
                   <Send size={14} />
                   {modalPublishing ? 'Publicando...' : 'Publicar'}
