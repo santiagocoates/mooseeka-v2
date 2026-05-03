@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, ArrowRight, Check, Upload, X, Plus, Star, Clock, RefreshCw, Music } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Upload, X, Plus, Star, Clock, RefreshCw, Music, Lock } from 'lucide-react'
 import Link from 'next/link'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -728,6 +728,45 @@ export default function NewServicePage() {
   const [data, setData] = useState<FormData>(INITIAL)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
+  const [isSeller, setIsSeller] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    async function checkSeller() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/login'); return }
+      const { data: profile } = await supabase
+        .from('profiles').select('is_seller').eq('id', user.id).single()
+      setIsSeller(profile?.is_seller ?? false)
+    }
+    checkSeller()
+  }, [router])
+
+  // Bloquear acceso a no-sellers
+  if (isSeller === null) return (
+    <div className="flex items-center justify-center min-h-[40vh]">
+      <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#8B3FFF', borderTopColor: 'transparent' }} />
+    </div>
+  )
+
+  if (isSeller === false) return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] gap-5 px-4 text-center">
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+        style={{ background: 'rgba(123,47,255,0.12)', border: '1px solid rgba(123,47,255,0.25)' }}>
+        <Lock size={24} style={{ color: '#A855F7' }} />
+      </div>
+      <div>
+        <h2 className="text-white font-black text-xl mb-2">Acceso restringido</h2>
+        <p className="text-sm max-w-xs" style={{ color: '#7A6890' }}>
+          Para publicar servicios necesitás ser aprobado como seller. Solicitalo desde el Market.
+        </p>
+      </div>
+      <Link href="/market"
+        className="px-6 py-3 rounded-full text-white font-bold text-sm gradient-magenta hover:opacity-90 transition-all">
+        Ir al Market
+      </Link>
+    </div>
+  )
 
   function setField(k: keyof FormData, v: string | string[] | File | null) {
     setData(prev => ({ ...prev, [k]: v }))

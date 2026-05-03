@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Sparkles, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BookOpen, Music, Package, Loader2 } from 'lucide-react'
@@ -43,28 +43,56 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default function MarketPage() {
-  const [products,    setProducts]    = useState<Product[]>([])
-  const [loading,     setLoading]     = useState(true)
-  const [search,      setSearch]      = useState('')
-  const [activeType,  setActiveType]  = useState('all')
+  const [products,         setProducts]         = useState<Product[]>([])
+  const [loading,          setLoading]          = useState(true)
+  const [search,           setSearch]           = useState('')
+  const [activeType,       setActiveType]       = useState('all')
+  const [isSeller,         setIsSeller]         = useState(false)
+  const [sellerRequested,  setSellerRequested]  = useState(false)
+  const [requesting,       setRequesting]       = useState(false)
+  const [requestDone,      setRequestDone]      = useState(false)
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data } = await supabase
-        .from('products')
-        .select(`
-          id, slug, title, type, price_usd, cover_url,
-          profile:profiles!products_seller_id_fkey(name, username, avatar_url)
-        `)
-        .eq('published', true)
-        .order('created_at', { ascending: false })
+
+      const [{ data }, { data: { user } }] = await Promise.all([
+        supabase
+          .from('products')
+          .select(`id, slug, title, type, price_usd, cover_url,
+            profile:profiles!products_seller_id_fkey(name, username, avatar_url)`)
+          .eq('published', true)
+          .order('created_at', { ascending: false }),
+        supabase.auth.getUser(),
+      ])
 
       setProducts((data ?? []) as unknown as Product[])
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_seller, seller_requested')
+          .eq('id', user.id)
+          .single()
+        setIsSeller(profile?.is_seller ?? false)
+        setSellerRequested(profile?.seller_requested ?? false)
+      }
+
       setLoading(false)
     }
     load()
   }, [])
+
+  async function handleSellerRequest() {
+    setRequesting(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setRequesting(false); return }
+    await supabase.from('profiles').update({ seller_requested: true }).eq('id', user.id)
+    setSellerRequested(true)
+    setRequestDone(true)
+    setRequesting(false)
+  }
 
   const filtered = products.filter(p => {
     const matchType   = activeType === 'all' || p.type === activeType
@@ -84,12 +112,53 @@ export default function MarketPage() {
             Cursos, beats y productos digitales de la industria musical
           </p>
         </div>
-        <Link href="/purchases"
-          className="text-sm font-semibold px-4 py-2 rounded-full transition-all"
-          style={{ background: 'rgba(123,47,255,0.15)', color: '#C0A8D8', border: '1px solid rgba(123,47,255,0.3)' }}>
-          Mis compras
-        </Link>
+        <div className="flex items-center gap-2">
+          {isSeller && (
+            <Link href="/services/new"
+              className="text-sm font-bold px-4 py-2 rounded-full transition-all gradient-magenta text-white hover:opacity-90">
+              + Publicar servicio
+            </Link>
+          )}
+          <Link href="/purchases"
+            className="text-sm font-semibold px-4 py-2 rounded-full transition-all"
+            style={{ background: 'rgba(123,47,255,0.15)', color: '#C0A8D8', border: '1px solid rgba(123,47,255,0.3)' }}>
+            Mis compras
+          </Link>
+        </div>
       </div>
+
+      {/* Banner seller — solo para no-sellers */}
+      {!loading && !isSeller && (
+        <div className="rounded-2xl p-5 mb-6 flex items-center gap-4"
+          style={{ background: 'rgba(139,63,255,0.08)', border: '1px solid rgba(139,63,255,0.25)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(139,63,255,0.2)' }}>
+            <Sparkles size={20} style={{ color: '#A855F7' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-sm">¿Querés vender en Mooseeka?</p>
+            <p className="text-xs mt-0.5" style={{ color: '#7A6890' }}>
+              Publicá tus servicios y llegá a miles de profesionales de la industria musical.
+            </p>
+          </div>
+          {sellerRequested ? (
+            <div className="flex items-center gap-1.5 px-4 py-2 rounded-full shrink-0"
+              style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)' }}>
+              <CheckCircle2 size={14} style={{ color: '#22c55e' }} />
+              <span className="text-xs font-bold" style={{ color: '#22c55e' }}>
+                {requestDone ? '¡Solicitud enviada!' : 'Solicitud pendiente'}
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={handleSellerRequest}
+              disabled={requesting}
+              className="text-sm font-bold px-4 py-2 rounded-full shrink-0 transition-all disabled:opacity-60 gradient-magenta text-white hover:opacity-90">
+              {requesting ? 'Enviando...' : 'Quiero publicar'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-4">
