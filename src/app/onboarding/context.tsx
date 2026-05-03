@@ -5,6 +5,8 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 export interface OnboardingData {
   name: string
   username: string
+  bio: string
+  location: string
   avatarFile: File | null
   avatarPreview: string | null
   bannerFile: File | null
@@ -24,6 +26,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<OnboardingData>({
     name: '',
     username: '',
+    bio: '',
+    location: '',
     avatarFile: null,
     avatarPreview: null,
     bannerFile: null,

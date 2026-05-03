@@ -18,7 +18,7 @@ export default function OnboardingListo() {
   const [countdown, setCountdown] = useState(3)
   const [saving, setSaving] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { name, username, avatarFile, avatarPreview, bannerFile, roles, genres, objetivo } = useOnboarding()
+  const { name, username, bio, location, avatarFile, avatarPreview, bannerFile, roles, genres, objetivo } = useOnboarding()
 
   useEffect(() => {
     async function save() {
@@ -57,6 +57,8 @@ export default function OnboardingListo() {
             username: username || user.email?.split('@')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || user.id.slice(0, 8),
             ...(avatar_url ? { avatar_url } : {}),
             ...(cover_url ? { cover_url } : {}),
+            ...(bio ? { bio } : {}),
+            ...(location ? { location } : {}),
             roles,
             genres,
             objetivo,

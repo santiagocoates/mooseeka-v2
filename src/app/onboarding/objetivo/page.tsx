@@ -72,7 +72,7 @@ export default function OnboardingObjetivo() {
           ¿Para qué usas Mooseeka?
         </h1>
         <p className="text-sm leading-relaxed" style={{ color: '#C0A8D8' }}>
-          Podés elegir varias opciones. Esto personaliza tu experiencia desde el primer día.
+          Puedes elegir varias opciones. Esto personaliza tu experiencia desde el primer día.
         </p>
       </div>
 
