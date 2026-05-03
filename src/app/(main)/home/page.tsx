@@ -266,7 +266,7 @@ export default function HomePage() {
             </p>
             <p className="text-xs" style={{ color: '#7A6890' }}>
               {feedTab === 'following'
-                ? 'Seguí a otros músicos para ver sus posts acá.'
+                ? 'Sigue a otros músicos para ver sus posts aquí.'
                 : 'Sé el primero en publicar algo.'}
             </p>
           </div>

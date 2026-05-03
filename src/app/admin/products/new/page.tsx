@@ -163,7 +163,7 @@ export default function NewProductPage() {
         <div>
           <label className="block text-sm font-semibold text-white mb-2">Descripción</label>
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
-            placeholder="Describí qué aprenderán o qué incluye el producto..."
+            placeholder="Describe qué aprenderán o qué incluye el producto..."
             className="w-full text-white placeholder-[#7A6890] px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(123,47,255,0.25)' }}
             onFocus={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.55)')}
@@ -210,8 +210,8 @@ export default function NewProductPage() {
             <p className="text-sm text-center py-6 rounded-xl"
               style={{ color: '#7A6890', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(123,47,255,0.2)' }}>
               {type === 'course'
-                ? 'Agregá las clases del curso (URLs de YouTube o Vimeo)'
-                : 'Agregá los archivos del producto'}
+                ? 'Agrega las clases del curso (URLs de YouTube o Vimeo)'
+                : 'Agrega los archivos del producto'}
             </p>
           )}
 

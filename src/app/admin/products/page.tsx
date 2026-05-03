@@ -92,9 +92,9 @@ export default function AdminProductsPage() {
         <div className="rounded-2xl p-14 text-center"
           style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(123,47,255,0.2)' }}>
           <p className="text-3xl mb-3">📦</p>
-          <p className="text-white font-bold mb-1">No tenés productos todavía</p>
+          <p className="text-white font-bold mb-1">No tienes productos todavía</p>
           <p className="text-sm mb-5" style={{ color: '#7A6890' }}>
-            Creá tu primer curso, beat o sample pack.
+            Crea tu primer curso, beat o sample pack.
           </p>
           <Link href="/admin/products/new"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-bold text-sm gradient-magenta hover:opacity-90 transition-all">

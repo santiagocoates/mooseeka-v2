@@ -190,7 +190,7 @@ export default function ExplorePage() {
             {isSearching ? 'Sin resultados' : 'Aún no hay perfiles'}
           </p>
           <p className="text-xs" style={{ color: '#7A6890' }}>
-            {isSearching ? 'Probá con otro nombre o rol.' : 'Sé el primero en unirte.'}
+            {isSearching ? 'Prueba con otro nombre o rol.' : 'Sé el primero en unirte.'}
           </p>
         </div>
       )}

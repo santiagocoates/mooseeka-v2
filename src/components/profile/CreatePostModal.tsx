@@ -178,10 +178,10 @@ export default function CreatePostModal({ open, profileId, onClose, onSave, init
               value={content}
               onChange={e => setContent(e.target.value.slice(0, CONTENT_LIMIT))}
               placeholder={
-                type === 'logro'       ? '¿Qué conseguiste? Contale a la comunidad...' :
+                type === 'logro'       ? '¿Qué lograste? Cuéntale a la comunidad...' :
                 type === 'lanzamiento' ? '¿Qué estás lanzando? Comparte los detalles...' :
-                type === 'video'       ? 'Describí el video, dónde fue filmado, de qué trata...' :
-                                         '¿A quién estás buscando? Describí el perfil ideal...'
+                type === 'video'       ? 'Describe el video, dónde fue filmado, de qué trata...' :
+                                         '¿A quién estás buscando? Describe el perfil ideal...'
               }
               rows={4}
               className="w-full text-white placeholder-[#7A6890] text-sm resize-none rounded-xl px-3 py-2.5 focus:outline-none"

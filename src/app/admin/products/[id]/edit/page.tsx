@@ -192,7 +192,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         <div>
           <label className="block text-sm font-semibold text-white mb-2">Descripción</label>
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
-            placeholder="Describí qué aprenderán o qué incluye el producto..."
+            placeholder="Describe qué aprenderán o qué incluye el producto..."
             className="w-full text-white placeholder-[#7A6890] px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(123,47,255,0.25)' }}
             onFocus={e => (e.currentTarget.style.borderColor = 'rgba(123,47,255,0.55)')}

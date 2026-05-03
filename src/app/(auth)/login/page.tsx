@@ -62,7 +62,7 @@ function LoginContent() {
         {hasAuthError && (
           <div className="w-full px-4 py-3 rounded-xl text-sm text-center"
             style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
-            Hubo un problema al iniciar sesión. Por favor intentá de nuevo.
+            Hubo un problema al iniciar sesión. Por favor intenta de nuevo.
           </div>
         )}
 

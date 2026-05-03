@@ -588,8 +588,8 @@ export default function CreatePost({ onPost }: CreatePostProps) {
                     <textarea value={content} onChange={e => handleModalTextChange(e.target.value.slice(0, CHAR_LIMIT))}
                       placeholder={
                         selectedType === 'lanzamiento' ? 'Describe lo que estás lanzando...' :
-                        selectedType === 'logro'       ? '¿Qué conseguiste? Contale a la comunidad...' :
-                        selectedType === 'video'       ? 'Describí el video...' :
+                        selectedType === 'logro'       ? '¿Qué lograste? Cuéntale a la comunidad...' :
+                        selectedType === 'video'       ? 'Describe el video...' :
                                                           '¿A quién estás buscando?'
                       }
                       rows={4} className="w-full bg-transparent text-white placeholder-[#7A6890] resize-none focus:outline-none text-sm leading-relaxed" />

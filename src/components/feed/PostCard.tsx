@@ -530,7 +530,7 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
                 value={commentText}
                 onChange={e => setCommentText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
-                placeholder="Escribí un comentario..."
+                placeholder="Escribe un comentario..."
                 maxLength={300}
                 className="flex-1 text-white placeholder-[#7A6890] text-xs px-3 py-2.5 rounded-xl focus:outline-none transition-colors"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(123,47,255,0.2)' }}

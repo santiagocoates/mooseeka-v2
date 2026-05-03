@@ -136,9 +136,9 @@ export default function MarketPage() {
             <Sparkles size={20} style={{ color: '#A855F7' }} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-bold text-sm">¿Querés vender en Mooseeka?</p>
+            <p className="text-white font-bold text-sm">¿Quieres vender en Mooseeka?</p>
             <p className="text-xs mt-0.5" style={{ color: '#7A6890' }}>
-              Publicá tus servicios y llegá a miles de profesionales de la industria musical.
+              Publica tus servicios y llega a miles de profesionales de la industria musical.
             </p>
           </div>
           {sellerRequested ? (
@@ -206,7 +206,7 @@ export default function MarketPage() {
           <p className="text-sm" style={{ color: '#7A6890' }}>
             {products.length === 0
               ? 'Próximamente habrá cursos, beats y más.'
-              : 'Probá con otra búsqueda o categoría.'}
+              : 'Prueba con otra búsqueda o categoría.'}
           </p>
         </div>
       )}

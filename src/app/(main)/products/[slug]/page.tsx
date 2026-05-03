@@ -200,7 +200,7 @@ export default function ProductPage() {
           <CheckCircle size={20} style={{ color: '#10b981' }} />
           <div>
             <p className="text-white font-bold text-sm">¡Compra exitosa!</p>
-            <p className="text-xs" style={{ color: '#C0A8D8' }}>Ya tenés acceso completo al contenido.</p>
+            <p className="text-xs" style={{ color: '#C0A8D8' }}>Ya tienes acceso completo al contenido.</p>
           </div>
         </div>
       )}
