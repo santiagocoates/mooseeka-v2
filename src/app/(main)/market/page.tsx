@@ -51,6 +51,7 @@ export default function MarketPage() {
   const [sellerRequested,  setSellerRequested]  = useState(false)
   const [requesting,       setRequesting]       = useState(false)
   const [requestDone,      setRequestDone]      = useState(false)
+  const [isLoggedIn,       setIsLoggedIn]       = useState<boolean | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -67,6 +68,7 @@ export default function MarketPage() {
       ])
 
       setProducts((data ?? []) as unknown as Product[])
+      setIsLoggedIn(!!user)
 
       if (user) {
         const { data: profile } = await supabase
@@ -127,8 +129,29 @@ export default function MarketPage() {
         </div>
       </div>
 
-      {/* Banner seller — solo para no-sellers */}
-      {!loading && !isSeller && (
+      {/* Banner de conversión — solo para no autenticados */}
+      {!loading && isLoggedIn === false && (
+        <div className="rounded-2xl p-5 mb-6 flex items-center gap-4"
+          style={{ background: 'linear-gradient(135deg, rgba(139,63,255,0.1), rgba(255,26,140,0.08))', border: '1px solid rgba(139,63,255,0.3)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(139,63,255,0.2)' }}>
+            <Sparkles size={20} style={{ color: '#A855F7' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-sm">Crea tu perfil gratis en Mooseeka</p>
+            <p className="text-xs mt-0.5" style={{ color: '#7A6890' }}>
+              Conecta con profesionales de la industria musical latinoamericana.
+            </p>
+          </div>
+          <Link href="/signup"
+            className="text-sm font-bold px-4 py-2 rounded-full shrink-0 transition-all hover:opacity-90 gradient-magenta text-white whitespace-nowrap">
+            Registrarse gratis
+          </Link>
+        </div>
+      )}
+
+      {/* Banner seller — solo para usuarios autenticados no-sellers */}
+      {!loading && isLoggedIn === true && !isSeller && (
         <div className="rounded-2xl p-5 mb-6 flex items-center gap-4"
           style={{ background: 'rgba(139,63,255,0.08)', border: '1px solid rgba(139,63,255,0.25)' }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
