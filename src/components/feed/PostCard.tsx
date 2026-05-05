@@ -192,7 +192,9 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
         .eq('post_id', post.id)
         .order('created_at', { ascending: true })
         .limit(50)
-      setComments((data as unknown as Comment[]) ?? [])
+      const loaded = (data as unknown as Comment[]) ?? []
+      setComments(loaded)
+      setCommentCount(loaded.length)
       setLoadingComments(false)
       setTimeout(() => commentInputRef.current?.focus(), 100)
     }
@@ -207,9 +209,9 @@ export default function PostCard({ post, currentUsername, currentUserId, onDelet
       .insert({ post_id: post.id, profile_id: currentUserId, content: commentText.trim() })
       .select('id, content, created_at, profile:profiles!comments_profile_id_fkey(id, name, username, avatar_url)')
       .single()
+    setCommentCount(prev => prev + 1)
     if (!error && data) {
       setComments(prev => [...prev, data as unknown as Comment])
-      setCommentCount(prev => prev + 1)
       setCommentText('')
       // Notificar al autor del post
       const supabase2 = createClient()
