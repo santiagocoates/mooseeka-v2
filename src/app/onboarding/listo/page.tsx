@@ -66,6 +66,18 @@ export default function OnboardingListo() {
           }, { onConflict: 'id' })
 
         if (updateError) throw updateError
+
+        // Notificar a Slack
+        fetch('/api/slack/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name || user.user_metadata?.full_name || '',
+            username: username || '',
+            roles,
+          }),
+        }).catch(() => {})
+
       } catch (err: unknown) {
         console.error('Onboarding save error:', err)
         setError('Hubo un error al guardar. Intenta de nuevo.')
