@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
-  const webhookUrl = process.env.SLACK_WEBHOOK_SIGNUPS
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL
   if (!webhookUrl) return NextResponse.json({ ok: false })
 
   try {
