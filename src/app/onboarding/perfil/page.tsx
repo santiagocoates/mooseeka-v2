@@ -7,7 +7,7 @@ import StepProgress from '@/components/onboarding/StepProgress'
 import { useOnboarding } from '../context'
 import { createClient } from '@/lib/supabase/client'
 
-const BIO_MIN = 20
+const BIO_MIN = 10
 const BIO_MAX = 300
 
 function toSlug(s: string) {
