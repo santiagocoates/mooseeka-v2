@@ -20,7 +20,7 @@ export default function Icon() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="https://app.mooseeka.com/isologo.png"
+          src="https://mooseeka-v2.vercel.app/isologo.png"
           alt="Mooseeka"
           width={28}
           height={28}
